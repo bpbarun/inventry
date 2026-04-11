@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, Edit2, Trash2, Search } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
 import ConfirmDialog from "../common/ConfirmDialog";
 import CategoryForm from "./CategoryForm";
@@ -8,6 +9,7 @@ import EmptyState from "../common/EmptyState";
 
 export default function Categories() {
   const { branches, categories, products, addCategory, updateCategory, deleteCategory } = useApp();
+  const toast = useToast();
   const [search, setSearch]   = useState("");
   const [filterB, setFilterB] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
@@ -81,12 +83,25 @@ export default function Categories() {
 
       {showAdd && (
         <Modal title="Add Category" onClose={() => setShowAdd(false)} size="md">
-          <CategoryForm onSave={async d => { await addCategory(d); setShowAdd(false); }} onCancel={() => setShowAdd(false)} />
+          <CategoryForm
+            onSave={async d => {
+              try { await addCategory(d); setShowAdd(false); toast.success("Category added successfully."); }
+              catch (e) { toast.error(e.message || "Failed to add category."); throw e; }
+            }}
+            onCancel={() => setShowAdd(false)}
+          />
         </Modal>
       )}
       {editItem && (
         <Modal title="Edit Category" onClose={() => setEditItem(null)} size="md">
-          <CategoryForm initial={editItem} onSave={async d => { await updateCategory(editItem.id, d); setEditItem(null); }} onCancel={() => setEditItem(null)} />
+          <CategoryForm
+            initial={editItem}
+            onSave={async d => {
+              try { await updateCategory(editItem.id, d); setEditItem(null); toast.success("Category updated successfully."); }
+              catch (e) { toast.error(e.message || "Failed to update category."); throw e; }
+            }}
+            onCancel={() => setEditItem(null)}
+          />
         </Modal>
       )}
       {delItem && (
@@ -94,7 +109,10 @@ export default function Categories() {
           title="Delete Category"
           message={`Delete "${delItem.name}"? All products in this category will also be removed.`}
           danger
-          onConfirm={async () => { await deleteCategory(delItem.id); setDelItem(null); }}
+          onConfirm={async () => {
+            try { await deleteCategory(delItem.id); setDelItem(null); toast.success("Category deleted."); }
+            catch (e) { toast.error(e.message || "Failed to delete category."); setDelItem(null); }
+          }}
           onCancel={() => setDelItem(null)}
         />
       )}

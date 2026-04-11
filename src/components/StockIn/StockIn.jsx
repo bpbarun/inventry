@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react";
 import { Plus } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
 import StockInForm from "./StockInForm";
 import DataTable from "../common/DataTable";
 
 export default function StockIn() {
   const { stockIns, products, branches, categories } = useApp();
+  const toast = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [filterB, setFilterB] = useState("all");
 
@@ -103,7 +105,10 @@ export default function StockIn() {
 
       {showAdd && (
         <Modal title="New Stock In" onClose={() => setShowAdd(false)} size="md">
-          <StockInForm onSave={() => setShowAdd(false)} onCancel={() => setShowAdd(false)} />
+          <StockInForm
+            onSave={() => { setShowAdd(false); toast.success("Stock in recorded successfully."); }}
+            onCancel={() => setShowAdd(false)}
+          />
         </Modal>
       )}
     </div>

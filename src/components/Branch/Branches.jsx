@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, Edit2, Trash2, MapPin, Phone, Mail, User } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
 import ConfirmDialog from "../common/ConfirmDialog";
 import BranchForm from "./BranchForm";
@@ -8,6 +9,7 @@ import EmptyState from "../common/EmptyState";
 
 export default function Branches() {
   const { branches, products, addBranch, updateBranch, deleteBranch } = useApp();
+  const toast = useToast();
   const [showAdd, setShowAdd]   = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [delItem, setDelItem]   = useState(null);
@@ -70,12 +72,25 @@ export default function Branches() {
 
       {showAdd && (
         <Modal title="Add Branch" onClose={() => setShowAdd(false)} size="md">
-          <BranchForm onSave={async d => { await addBranch(d); setShowAdd(false); }} onCancel={() => setShowAdd(false)} />
+          <BranchForm
+            onSave={async d => {
+              try { await addBranch(d); setShowAdd(false); toast.success("Branch added successfully."); }
+              catch (e) { toast.error(e.message || "Failed to add branch."); throw e; }
+            }}
+            onCancel={() => setShowAdd(false)}
+          />
         </Modal>
       )}
       {editItem && (
         <Modal title="Edit Branch" onClose={() => setEditItem(null)} size="md">
-          <BranchForm initial={editItem} onSave={async d => { await updateBranch(editItem.id, d); setEditItem(null); }} onCancel={() => setEditItem(null)} />
+          <BranchForm
+            initial={editItem}
+            onSave={async d => {
+              try { await updateBranch(editItem.id, d); setEditItem(null); toast.success("Branch updated successfully."); }
+              catch (e) { toast.error(e.message || "Failed to update branch."); throw e; }
+            }}
+            onCancel={() => setEditItem(null)}
+          />
         </Modal>
       )}
       {delItem && (
@@ -83,7 +98,10 @@ export default function Branches() {
           title="Delete Branch"
           message={`Delete "${delItem.name}"? This will also delete all its products. This cannot be undone.`}
           danger
-          onConfirm={async () => { await deleteBranch(delItem.id); setDelItem(null); }}
+          onConfirm={async () => {
+            try { await deleteBranch(delItem.id); setDelItem(null); toast.success("Branch deleted."); }
+            catch (e) { toast.error(e.message || "Failed to delete branch."); setDelItem(null); }
+          }}
           onCancel={() => setDelItem(null)}
         />
       )}

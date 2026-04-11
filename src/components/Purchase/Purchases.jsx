@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Plus, Eye, Edit2, Trash2 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
 import ConfirmDialog from "../common/ConfirmDialog";
 import PurchaseForm from "./PurchaseForm";
@@ -21,6 +22,7 @@ const ALL_STATUSES = ["Draft", "Ordered", "Partial", "Received", "Cancelled"];
 
 export default function Purchases() {
   const { purchases, branches, addPurchase, updatePurchase, deletePurchase } = useApp();
+  const toast = useToast();
 
   const [filterB, setFilterB] = useState("all");
   const [filterS, setFilterS] = useState("all");
@@ -44,7 +46,10 @@ export default function Purchases() {
   const statusCount = s => purchases.filter(p => p.status === s).length;
 
   const handleCreatePO = (prefillData = null) => { setPrefill(prefillData); setShowAdd(true); };
-  const handleSaveNew  = async (data) => { await addPurchase(data); setShowAdd(false); setPrefill(null); };
+  const handleSaveNew  = async (data) => {
+    try { await addPurchase(data); setShowAdd(false); setPrefill(null); toast.success("Purchase order created."); }
+    catch (e) { toast.error(e.message || "Failed to create purchase order."); throw e; }
+  };
   const handleCancelNew = () => { setShowAdd(false); setPrefill(null); };
 
   const columns = useMemo(() => [
@@ -174,7 +179,10 @@ export default function Purchases() {
         <Modal title={`Edit ${editPO.orderNumber}`} onClose={() => setEditPO(null)} size="xl">
           <PurchaseForm
             initial={editPO}
-            onSave={async d => { await updatePurchase(editPO.id, d); setEditPO(null); }}
+            onSave={async d => {
+              try { await updatePurchase(editPO.id, d); setEditPO(null); toast.success("Purchase order updated."); }
+              catch (e) { toast.error(e.message || "Failed to update purchase order."); throw e; }
+            }}
             onCancel={() => setEditPO(null)}
           />
         </Modal>
@@ -189,7 +197,10 @@ export default function Purchases() {
           title="Delete Purchase Order"
           message={`Delete "${delPO.orderNumber}"? This cannot be undone.`}
           danger
-          onConfirm={async () => { await deletePurchase(delPO.id); setDelPO(null); }}
+          onConfirm={async () => {
+            try { await deletePurchase(delPO.id); setDelPO(null); toast.success("Purchase order deleted."); }
+            catch (e) { toast.error(e.message || "Failed to delete purchase order."); setDelPO(null); }
+          }}
           onCancel={() => setDelPO(null)}
         />
       )}

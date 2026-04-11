@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Plus, Edit2, Trash2, Filter } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
 import ConfirmDialog from "../common/ConfirmDialog";
 import ProductForm from "./ProductForm";
@@ -9,6 +10,7 @@ import DataTable from "../common/DataTable";
 
 export default function Products() {
   const { branches, categories, products, addProduct, updateProduct, deleteProduct } = useApp();
+  const toast = useToast();
 
   const [filterB, setFilterB]   = useState("all");
   const [filterC, setFilterC]   = useState("all");
@@ -139,17 +141,34 @@ export default function Products() {
 
       {showAdd && (
         <Modal title="Add Product" onClose={() => setShowAdd(false)} size="lg">
-          <ProductForm onSave={async d => { await addProduct(d); setShowAdd(false); }} onCancel={() => setShowAdd(false)} />
+          <ProductForm
+            onSave={async d => {
+              try { await addProduct(d); setShowAdd(false); toast.success("Product added successfully."); }
+              catch (e) { toast.error(e.message || "Failed to add product."); throw e; }
+            }}
+            onCancel={() => setShowAdd(false)}
+          />
         </Modal>
       )}
       {editItem && (
         <Modal title="Edit Product" onClose={() => setEditItem(null)} size="lg">
-          <ProductForm initial={editItem} onSave={async d => { await updateProduct(editItem.id, d); setEditItem(null); }} onCancel={() => setEditItem(null)} />
+          <ProductForm
+            initial={editItem}
+            onSave={async d => {
+              try { await updateProduct(editItem.id, d); setEditItem(null); toast.success("Product updated successfully."); }
+              catch (e) { toast.error(e.message || "Failed to update product."); throw e; }
+            }}
+            onCancel={() => setEditItem(null)}
+          />
         </Modal>
       )}
       {delItem && (
         <ConfirmDialog title="Delete Product" message={`Delete "${delItem.name}"? This cannot be undone.`} danger
-          onConfirm={async () => { await deleteProduct(delItem.id); setDelItem(null); }} onCancel={() => setDelItem(null)} />
+          onConfirm={async () => {
+            try { await deleteProduct(delItem.id); setDelItem(null); toast.success("Product deleted."); }
+            catch (e) { toast.error(e.message || "Failed to delete product."); setDelItem(null); }
+          }}
+          onCancel={() => setDelItem(null)} />
       )}
     </div>
   );

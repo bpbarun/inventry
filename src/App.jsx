@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AppProvider, useApp } from "./context/AppContext";
+import { ToastProvider } from "./context/ToastContext";
 import Layout from "./components/Layout/Layout";
 import Login from "./components/Auth/Login";
 import { ROLE_ACCESS, ROLE_HOME } from "./config/roles";
@@ -102,7 +103,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <ProtectedApp />
+        <ToastProvider>
+          <ProtectedApp />
+        </ToastProvider>
       </BrowserRouter>
     </AuthProvider>
   );

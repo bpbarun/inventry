@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CheckCircle, XCircle, Edit2, Truck, Calendar, Building2, FileText } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useToast } from "../../context/ToastContext";
 import ConfirmDialog from "../common/ConfirmDialog";
 import Modal from "../common/Modal";
 import PurchaseForm from "./PurchaseForm";
@@ -15,6 +16,7 @@ const STATUS_COLOR = {
 
 export default function PurchaseDetail({ po, onClose }) {
   const { branches, categories, products, receivePurchase, updatePurchase, updatePurchaseStatus } = useApp();
+  const toast = useToast();
   const [confirmReceive, setConfirmReceive] = useState(false);
   const [confirmCancel, setConfirmCancel]   = useState(false);
   const [showEdit, setShowEdit]             = useState(false);
@@ -29,15 +31,27 @@ export default function PurchaseDetail({ po, onClose }) {
   const canCancel  = po.status === "Draft" || po.status === "Ordered";
 
   const handleReceive = async () => {
-    await receivePurchase(po.id);
-    setConfirmReceive(false);
-    onClose();
+    try {
+      await receivePurchase(po.id);
+      setConfirmReceive(false);
+      onClose();
+      toast.success("Stock received and inventory updated.");
+    } catch (e) {
+      toast.error(e.message || "Failed to receive stock.");
+      setConfirmReceive(false);
+    }
   };
 
   const handleCancel = async () => {
-    await updatePurchaseStatus(po.id, "Cancelled");
-    setConfirmCancel(false);
-    onClose();
+    try {
+      await updatePurchaseStatus(po.id, "Cancelled");
+      setConfirmCancel(false);
+      onClose();
+      toast.success("Purchase order cancelled.");
+    } catch (e) {
+      toast.error(e.message || "Failed to cancel order.");
+      setConfirmCancel(false);
+    }
   };
 
   return (
@@ -133,7 +147,10 @@ export default function PurchaseDetail({ po, onClose }) {
             <button className="btn btn-outline" onClick={() => setShowEdit(true)}><Edit2 size={14} /> Edit</button>
           )}
           {canOrder && (
-            <button className="btn btn-primary" onClick={async () => { await updatePurchaseStatus(po.id, "Ordered"); onClose(); }}>
+            <button className="btn btn-primary" onClick={async () => {
+              try { await updatePurchaseStatus(po.id, "Ordered"); onClose(); toast.success("Order marked as Ordered."); }
+              catch (e) { toast.error(e.message || "Failed to update status."); }
+            }}>
               <Truck size={14} /> Mark as Ordered
             </button>
           )}
@@ -171,7 +188,10 @@ export default function PurchaseDetail({ po, onClose }) {
         <Modal title={`Edit ${po.orderNumber}`} onClose={() => setShowEdit(false)} size="xl">
           <PurchaseForm
             initial={po}
-            onSave={async data => { await updatePurchase(po.id, data); setShowEdit(false); onClose(); }}
+            onSave={async data => {
+              try { await updatePurchase(po.id, data); setShowEdit(false); onClose(); toast.success("Purchase order updated."); }
+              catch (e) { toast.error(e.message || "Failed to update purchase order."); throw e; }
+            }}
             onCancel={() => setShowEdit(false)}
           />
         </Modal>
