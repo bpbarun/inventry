@@ -23,7 +23,7 @@ export default function Navbar({ onMenu }) {
       <div className="navbar-left">
         <button className="icon-btn" onClick={onMenu}><Menu size={22} /></button>
         <div className="navbar-brand">
-          <span className="navbar-brand-title">GlassTech Inventory</span>
+          <span className="navbar-brand-title">Inventory</span>
         </div>
       </div>
       <div className="navbar-right">
