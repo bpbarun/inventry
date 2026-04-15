@@ -148,3 +148,8 @@ export const stockOutApi = {
 export const dashboardApi = {
   get: () => request('GET', '/dashboard'),
 };
+
+// ── Import ────────────────────────────────────────────────────────────────────
+export const importApi = {
+  products: (rows) => request('POST', '/import/products', { rows }),
+};

@@ -26,6 +26,7 @@ const Products   = lazy(() => import("./components/Product/Products"));
 const Purchases  = lazy(() => import("./components/Purchase/Purchases"));
 const StockIn    = lazy(() => import("./components/StockIn/StockIn"));
 const StockOut   = lazy(() => import("./components/StockOut/StockOut"));
+const ImportData = lazy(() => import("./components/Import/ImportData"));
 
 function AppRoutes() {
   const { loading, error, loadAll } = useApp();
@@ -64,6 +65,7 @@ function AppRoutes() {
           <Route path="purchases"  element={<RoleRoute path="/purchases"><Purchases /></RoleRoute>} />
           <Route path="stock-in"   element={<RoleRoute path="/stock-in"><StockIn /></RoleRoute>} />
           <Route path="stock-out"  element={<RoleRoute path="/stock-out"><StockOut /></RoleRoute>} />
+          <Route path="import"     element={<RoleRoute path="/import"><ImportData /></RoleRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
