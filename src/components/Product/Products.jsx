@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Edit2, Trash2, Filter } from "lucide-react";
+import { Plus, Edit2, Trash2, Filter, ScanLine } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
@@ -7,26 +7,63 @@ import ConfirmDialog from "../common/ConfirmDialog";
 import ProductForm from "./ProductForm";
 import EmptyState from "../common/EmptyState";
 import DataTable from "../common/DataTable";
+import BarcodeScanner from "../common/BarcodeScanner";
 
 export default function Products() {
   const { branches, categories, products, addProduct, updateProduct, deleteProduct } = useApp();
   const toast = useToast();
 
   const [filterB, setFilterB]   = useState("all");
-  const [filterC, setFilterC]   = useState("all");
+  const [filterC, setFilterC]   = useState("all"); // root category
+  const [filterSub, setFilterSub] = useState("all"); // subcategory
   const [filterS, setFilterS]   = useState("all");
   const [showAdd, setShowAdd]   = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [delItem, setDelItem]   = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanHighlight, setScanHighlight] = useState(null); // product id
 
-  const filteredCats = filterB === "all"
-    ? categories
-    : categories.filter(c => !c.branchId || parseInt(c.branchId) === parseInt(filterB));
+  const handleScan = (value) => {
+    setScanning(false);
+    const match = products.find(p =>
+      p.sku?.toLowerCase() === value.toLowerCase() ||
+      String(p.id) === value
+    );
+    if (match) {
+      setFilterB("all"); setFilterC("all"); setFilterSub("all"); setFilterS("all");
+      setScanHighlight(match.id);
+      toast.success(`Found: ${match.name} — SKU ${match.sku}`);
+      setTimeout(() => setScanHighlight(null), 3000);
+    } else {
+      toast.error(`No product matched barcode: ${value}`);
+    }
+  };
+
+  // Root categories relevant to selected branch
+  const rootCats = categories.filter(c =>
+    !c.parentId && (filterB === "all" || products.some(p => {
+      if (parseInt(p.branchId) !== parseInt(filterB)) return false;
+      const cat = categories.find(x => x.id === p.categoryId);
+      return p.categoryId === c.id || (cat && cat.parentId === c.id);
+    }))
+  );
+
+  // Subcategories of selected root
+  const subCats = filterC === "all"
+    ? []
+    : categories.filter(c => c.parentId === parseInt(filterC));
+
+  // Build effective category id set for filtering
+  const catFilterIds = filterSub !== "all"
+    ? new Set([parseInt(filterSub)])
+    : filterC !== "all"
+      ? new Set([parseInt(filterC), ...categories.filter(c => c.parentId === parseInt(filterC)).map(c => c.id)])
+      : null;
 
   const filtered = useMemo(() =>
     products.filter(p => {
       const matchB = filterB === "all" || parseInt(p.branchId) === parseInt(filterB);
-      const matchC = filterC === "all" || parseInt(p.categoryId) === parseInt(filterC);
+      const matchC = !catFilterIds || catFilterIds.has(p.categoryId);
       const matchS =
         filterS === "all" ||
         (filterS === "ok"  && Number(p.stock) > Number(p.minStock)) ||
@@ -34,7 +71,7 @@ export default function Products() {
         (filterS === "out" && Number(p.stock) === 0);
       return matchB && matchC && matchS;
     }),
-  [products, filterB, filterC, filterS]);
+  [products, filterB, filterC, filterSub, filterS]); // eslint-disable-line
 
   const columns = useMemo(() => [
     {
@@ -106,21 +143,40 @@ export default function Products() {
           <h1 className="page-title">Products</h1>
           <p className="page-subtitle">{products.length} products across all branches</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-          <Plus size={15} /> Add Product
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-outline" onClick={() => setScanning(true)}>
+            <ScanLine size={15} /> Scan
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+            <Plus size={15} /> Add Product
+          </button>
+        </div>
       </div>
+
+      {scanning && (
+        <BarcodeScanner
+          title="Scan to Find Product"
+          onScan={handleScan}
+          onClose={() => setScanning(false)}
+        />
+      )}
 
       <div className="card filters-bar">
         <Filter size={14} style={{ color: "var(--text-meta)", flexShrink: 0 }} />
-        <select className="form-input select-sm" value={filterB} onChange={e => { setFilterB(e.target.value); setFilterC("all"); }}>
+        <select className="form-input select-sm" value={filterB} onChange={e => { setFilterB(e.target.value); setFilterC("all"); setFilterSub("all"); }}>
           <option value="all">All Branches</option>
           {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        <select className="form-input select-sm" value={filterC} onChange={e => setFilterC(e.target.value)}>
+        <select className="form-input select-sm" value={filterC} onChange={e => { setFilterC(e.target.value); setFilterSub("all"); }}>
           <option value="all">All Categories</option>
-          {filteredCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+          {rootCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
+        {subCats.length > 0 && (
+          <select className="form-input select-sm" value={filterSub} onChange={e => setFilterSub(e.target.value)}>
+            <option value="all">All Subcategories</option>
+            {subCats.map(s => <option key={s.id} value={s.id}>{s.icon} {s.name}</option>)}
+          </select>
+        )}
         <select className="form-input select-sm" value={filterS} onChange={e => setFilterS(e.target.value)}>
           <option value="all">All Stock</option>
           <option value="ok">In Stock</option>
@@ -135,7 +191,14 @@ export default function Products() {
           action={<button className="btn btn-primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add Product</button>} />
       ) : (
         <div className="card">
-          <DataTable columns={columns} data={filtered} fileName="products" defaultPageSize={10} emptyMessage="No products match your filters." />
+          <DataTable
+            columns={columns}
+            data={filtered}
+            fileName="products"
+            defaultPageSize={10}
+            emptyMessage="No products match your filters."
+            rowClassName={r => r.id === scanHighlight ? "row-scan-highlight" : ""}
+          />
         </div>
       )}
 

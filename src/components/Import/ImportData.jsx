@@ -7,14 +7,14 @@ import { useToast } from "../../context/ToastContext";
 import "./ImportData.css";
 
 const REQUIRED_COLS  = ["branch", "category", "name"];
-const OPTIONAL_COLS  = ["sku", "unit", "cost_price", "selling_price", "stock", "min_stock", "max_stock", "description"];
+const OPTIONAL_COLS  = ["subcategory", "sku", "unit", "cost_price", "selling_price", "stock", "min_stock", "max_stock", "description"];
 const ALL_COLS       = [...REQUIRED_COLS, ...OPTIONAL_COLS];
 
 const TEMPLATE_DATA = [
-  ["branch", "category", "name", "sku", "unit", "cost_price", "selling_price", "stock", "min_stock", "max_stock", "description"],
-  ["Main Branch", "Electronics", "USB Cable", "USB-001", "pcs", 50, 99, 100, 10, 500, "Type-C USB Cable"],
-  ["Main Branch", "Electronics", "Phone Stand", "PS-002", "pcs", 120, 249, 50, 5, 200, "Adjustable phone stand"],
-  ["Warehouse", "Stationery", "Ball Pen", "BP-001", "box", 20, 45, 200, 20, 1000, "Blue ball pen box of 10"],
+  ["branch", "category", "subcategory", "name", "sku", "unit", "cost_price", "selling_price", "stock", "min_stock", "max_stock", "description"],
+  ["Main Branch", "Electronics", "",         "USB Cable",  "USB-001", "pcs", 50,  99,  100, 10, 500,  "Type-C USB Cable"],
+  ["Main Branch", "Electronics", "Cables",   "HDMI Cable", "HDMI-01", "pcs", 80,  149, 60,  5,  300,  "HDMI 2.0 cable"],
+  ["Warehouse",   "Stationery",  "Writing",  "Ball Pen",   "BP-001",  "box", 20,  45,  200, 20, 1000, "Blue ball pen box of 10"],
 ];
 
 function downloadTemplate() {

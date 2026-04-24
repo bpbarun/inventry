@@ -2,15 +2,23 @@ import { useState } from "react";
 import { useApp } from "../../context/AppContext";
 
 const ICONS = ["🪟","🔲","🔧","🔩","📦","🏗️","🔑","⚙️","🪝","🛡️"];
-const empty = { branchId: "", name: "", icon: "📦", description: "" };
+const empty = { branchId: "", parentId: "", name: "", icon: "📦", description: "" };
 
 export default function CategoryForm({ initial = null, onSave, onCancel }) {
-  const { branches } = useApp();
-  const [f, setF]     = useState(initial ? { ...initial, branchId: String(initial.branchId || "") } : empty);
+  const { branches, categories } = useApp();
+  const [f, setF] = useState(initial
+    ? { ...initial, branchId: String(initial.branchId || ""), parentId: String(initial.parentId || "") }
+    : empty
+  );
   const [err, setErr] = useState({});
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => { setF(p => ({ ...p, [k]: v })); setErr(p => ({ ...p, [k]: "" })); };
+
+  // Only root categories (no parent) can be parents; exclude self
+  const parentOptions = categories.filter(c =>
+    !c.parentId && (!initial || c.id !== initial.id)
+  );
 
   const submit = async (e) => {
     e.preventDefault();
@@ -19,7 +27,11 @@ export default function CategoryForm({ initial = null, onSave, onCancel }) {
     if (Object.keys(e2).length) { setErr(e2); return; }
     setSaving(true);
     try {
-      await onSave({ ...f, branchId: f.branchId ? parseInt(f.branchId) : null });
+      await onSave({
+        ...f,
+        branchId: f.branchId ? parseInt(f.branchId) : null,
+        parentId: f.parentId ? parseInt(f.parentId) : null,
+      });
     } catch (err) {
       setErr({ api: err.message });
     } finally {
@@ -39,6 +51,15 @@ export default function CategoryForm({ initial = null, onSave, onCancel }) {
           </select>
         </div>
         <div className="form-group">
+          <label className="form-label">Parent Category (optional)</label>
+          <select className="form-input" value={f.parentId} onChange={e => set("parentId", e.target.value)}>
+            <option value="">-- Top Level --</option>
+            {parentOptions.map(c => (
+              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group form-span-2">
           <label className="form-label">Category Name *</label>
           <input className={`form-input${err.name ? " input-error" : ""}`} value={f.name} onChange={e => set("name", e.target.value)} placeholder="e.g. UPVC Profiles" />
           {err.name && <span className="form-error">{err.name}</span>}

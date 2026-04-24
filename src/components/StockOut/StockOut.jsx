@@ -1,16 +1,20 @@
 import { useState, useMemo } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Printer } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
 import StockOutForm from "./StockOutForm";
+import StockOutBill from "./StockOutBill";
 import DataTable from "../common/DataTable";
 
+const PRINT_ENABLED = import.meta.env.VITE_STOCK_OUT_PRINT_BILL === "true";
+
 export default function StockOut() {
-  const { stockOuts, products, branches, categories } = useApp();
+  const { stockOuts, products, branches, categories, addStockOut } = useApp();
   const toast = useToast();
-  const [showAdd, setShowAdd] = useState(false);
-  const [filterB, setFilterB] = useState("all");
+  const [showAdd,   setShowAdd]   = useState(false);
+  const [filterB,   setFilterB]   = useState("all");
+  const [billRecord, setBillRecord] = useState(null); // record to print
 
   const filtered = useMemo(() =>
     [...stockOuts]
@@ -71,12 +75,17 @@ export default function StockOut() {
       render: r => <span className="td-meta">{r.date}</span>,
       exportValue: r => r.date,
     },
-    {
-      key: "notes", label: "Notes",
-      render: r => <span className="td-meta td-truncate">{r.notes || "—"}</span>,
-      exportValue: r => r.notes || "",
-    },
+    ...(PRINT_ENABLED ? [{
+      key: "actions", label: "", exportValue: false, stopClick: true,
+      render: r => (
+        <button className="icon-btn" title="Print Bill" onClick={() => setBillRecord(r)}>
+          <Printer size={14} />
+        </button>
+      ),
+    }] : []),
   ], [products, branches, categories]); // eslint-disable-line
+
+  const billProduct = billRecord ? products.find(p => p.id === billRecord.productId) : null;
 
   return (
     <div className="page">
@@ -106,10 +115,28 @@ export default function StockOut() {
       {showAdd && (
         <Modal title="New Stock Out" onClose={() => setShowAdd(false)} size="md">
           <StockOutForm
-            onSave={() => { setShowAdd(false); toast.success("Stock out recorded successfully."); }}
+            onSave={async (data) => {
+              try {
+                const created = await addStockOut(data);
+                setShowAdd(false);
+                toast.success("Stock out recorded successfully.");
+                if (PRINT_ENABLED) setBillRecord(created); // auto-open bill after save
+              } catch (e) {
+                toast.error(e.message || "Failed to record stock out.");
+                throw e;
+              }
+            }}
             onCancel={() => setShowAdd(false)}
           />
         </Modal>
+      )}
+
+      {PRINT_ENABLED && billRecord && (
+        <StockOutBill
+          record={billRecord}
+          product={billProduct}
+          onClose={() => setBillRecord(null)}
+        />
       )}
     </div>
   );

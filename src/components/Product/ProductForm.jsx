@@ -1,56 +1,78 @@
 import { useState } from "react";
 import { useApp } from "../../context/AppContext";
 
-const empty = { branchId: "", categoryId: "", name: "", sku: "", unit: "", costPrice: "", sellingPrice: "", stock: "", minStock: "", location: "", color: "", description: "" };
+const empty = {
+  branchId: "", parentCatId: "", categoryId: "",
+  name: "", sku: "", unit: "", costPrice: "", sellingPrice: "",
+  stock: "", minStock: "", location: "", color: "", description: "",
+};
 
 export default function ProductForm({ initial = null, onSave, onCancel }) {
   const { branches, categories } = useApp();
-  const [f, setF] = useState(
-    initial ? {
-      ...initial,
-      branchId:   String(initial.branchId   || ""),
-      categoryId: String(initial.categoryId || ""),
-    } : empty
-  );
+
+  const resolveParent = (catId) => {
+    if (!catId) return "";
+    const cat = categories.find(c => c.id === parseInt(catId));
+    return cat ? String(cat.parentId || cat.id) : "";
+  };
+
+  const [f, setF] = useState(initial ? {
+    ...initial,
+    branchId:    String(initial.branchId   || ""),
+    categoryId:  String(initial.categoryId || ""),
+    parentCatId: resolveParent(initial.categoryId),
+  } : empty);
   const [err, setErr]       = useState({});
   const [saving, setSaving] = useState(false);
 
   const set = (k, v) => { setF(p => ({ ...p, [k]: v })); setErr(p => ({ ...p, [k]: "" })); };
 
-  const onBranchChange = (val) => { setF(p => ({ ...p, branchId: val, categoryId: "" })); };
+  const onBranchChange = (val) => setF(p => ({ ...p, branchId: val, parentCatId: "", categoryId: "" }));
+  const onParentCatChange = (val) => setF(p => ({ ...p, parentCatId: val, categoryId: val }));
+  const onSubCatChange = (val) => setF(p => ({ ...p, categoryId: val || f.parentCatId }));
 
-  const filteredCats = f.branchId
+  // Root categories (no parent) relevant to selected branch
+  const allCats   = f.branchId
     ? categories.filter(c => !c.branchId || parseInt(c.branchId) === parseInt(f.branchId))
     : categories;
+  const rootCats  = allCats.filter(c => !c.parentId);
+  const subCats   = f.parentCatId
+    ? categories.filter(c => c.parentId === parseInt(f.parentCatId))
+    : [];
+
+  // Is the current categoryId a subcategory?
+  const selectedSubId = subCats.length > 0 && f.categoryId !== f.parentCatId
+    ? f.categoryId
+    : "";
 
   const submit = async (e) => {
     e.preventDefault();
     const e2 = {};
-    if (!f.branchId)                         e2.branchId   = "Select a branch";
-    if (!f.categoryId)                       e2.categoryId = "Select a category";
-    if (!f.name.trim())                      e2.name       = "Name is required";
-    if (!f.sku.trim())                       e2.sku        = "SKU is required";
-    if (!f.unit.trim())                      e2.unit       = "Unit is required";
-    if (!f.costPrice || isNaN(f.costPrice))  e2.costPrice  = "Valid cost price required";
-    if (!f.sellingPrice  || isNaN(f.sellingPrice)) e2.sellingPrice  = "Valid selling price required";
-    if (f.stock === "" || isNaN(f.stock))    e2.stock      = "Stock quantity required";
-    if (!f.minStock || isNaN(f.minStock))    e2.minStock   = "Min stock required";
+    if (!f.branchId)                              e2.branchId   = "Select a branch";
+    if (!f.categoryId)                            e2.parentCatId = "Select a category";
+    if (!f.name.trim())                           e2.name       = "Name is required";
+    if (!f.sku.trim())                            e2.sku        = "SKU is required";
+    if (!f.unit.trim())                           e2.unit       = "Unit is required";
+    if (!f.costPrice    || isNaN(f.costPrice))    e2.costPrice  = "Valid cost price required";
+    if (!f.sellingPrice || isNaN(f.sellingPrice)) e2.sellingPrice = "Valid selling price required";
+    if (f.stock === "" || isNaN(f.stock))         e2.stock      = "Stock quantity required";
+    if (!f.minStock     || isNaN(f.minStock))     e2.minStock   = "Min stock required";
     if (Object.keys(e2).length) { setErr(e2); return; }
 
     setSaving(true);
     try {
       await onSave({
-        categoryId:    parseInt(f.categoryId),
-        name:          f.name,
-        sku:           f.sku,
-        unit:          f.unit,
-        costPrice:     parseFloat(f.costPrice),
-        sellingPrice:  parseFloat(f.sellingPrice),
-        stock:         parseInt(f.stock),
-        minStock:      parseInt(f.minStock),
-        location:      f.location,
-        color:         f.color,
-        description:   f.description,
+        categoryId:   parseInt(f.categoryId),
+        name:         f.name,
+        sku:          f.sku,
+        unit:         f.unit,
+        costPrice:    parseFloat(f.costPrice),
+        sellingPrice: parseFloat(f.sellingPrice),
+        stock:        parseInt(f.stock),
+        minStock:     parseInt(f.minStock),
+        location:     f.location,
+        color:        f.color,
+        description:  f.description,
       });
     } catch (err) {
       setErr({ api: err.message });
@@ -71,14 +93,25 @@ export default function ProductForm({ initial = null, onSave, onCancel }) {
           </select>
           {err.branchId && <span className="form-error">{err.branchId}</span>}
         </div>
+
         <div className="form-group">
           <label className="form-label">Category *</label>
-          <select className={`form-input${err.categoryId ? " input-error" : ""}`} value={f.categoryId} onChange={e => set("categoryId", e.target.value)}>
+          <select className={`form-input${err.parentCatId ? " input-error" : ""}`} value={f.parentCatId} onChange={e => onParentCatChange(e.target.value)}>
             <option value="">-- Select Category --</option>
-            {filteredCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+            {rootCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
           </select>
-          {err.categoryId && <span className="form-error">{err.categoryId}</span>}
+          {err.parentCatId && <span className="form-error">{err.parentCatId}</span>}
         </div>
+
+        {subCats.length > 0 && (
+          <div className="form-group form-span-2">
+            <label className="form-label">Subcategory <span className="td-meta">(optional)</span></label>
+            <select className="form-input" value={selectedSubId} onChange={e => onSubCatChange(e.target.value)}>
+              <option value="">-- No Subcategory --</option>
+              {subCats.map(s => <option key={s.id} value={s.id}>{s.icon} {s.name}</option>)}
+            </select>
+          </div>
+        )}
 
         <div className="form-group form-span-2">
           <label className="form-label">Product Name *</label>

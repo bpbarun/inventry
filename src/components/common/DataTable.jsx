@@ -34,6 +34,7 @@ export default function DataTable({
   defaultPageSize = 10,
   emptyMessage = "No records found.",
   onRowClick,
+  rowClassName,
   extraToolbar,
 }) {
   const [sort, setSort]     = useState({ key: null, dir: "asc" });
@@ -224,7 +225,7 @@ export default function DataTable({
                 <tr
                   key={row.id ?? idx}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={onRowClick ? "dt-row-clickable" : ""}
+                  className={[onRowClick ? "dt-row-clickable" : "", rowClassName?.(row) ?? ""].filter(Boolean).join(" ")}
                 >
                   {columns.map((col) => (
                     <td key={col.key} style={col.tdStyle} onClick={col.stopClick ? (e) => e.stopPropagation() : undefined}>

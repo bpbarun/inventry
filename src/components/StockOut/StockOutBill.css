@@ -1,0 +1,71 @@
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.bill-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.bill-modal {
+  background: #fff; border-radius: 14px;
+  width: 100%; max-width: 740px; max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  overflow: hidden;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.bill-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 20px; border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc; flex-shrink: 0;
+}
+.bill-toolbar-title  { font-size: 15px; font-weight: 600; color: #1e293b; }
+.bill-toolbar-actions { display: flex; gap: 8px; }
+
+/* ── Preview area ────────────────────────────────────────────────────────── */
+.bill-preview {
+  overflow-y: auto; padding: 32px 40px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  flex: 1;
+}
+
+/* ── Bill head ───────────────────────────────────────────────────────────── */
+.bill-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 28px; border-bottom: 2px solid #6366f1; padding-bottom: 18px;
+}
+.bill-brand      { font-size: 26px; font-weight: 800; color: #6366f1; letter-spacing: -.5px; }
+.bill-brand-sub  { font-size: 12px; color: #64748b; margin-top: 2px; }
+.bill-no-block   { text-align: right; }
+.bill-no         { font-size: 18px; font-weight: 700; color: #1e293b; }
+.bill-no-label   { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── Meta grid ───────────────────────────────────────────────────────────── */
+.bill-meta        { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 24px; }
+.bill-meta-row    { display: flex; gap: 6px; font-size: 13px; }
+.bill-meta-lbl    { color: #64748b; min-width: 72px; flex-shrink: 0; }
+.bill-meta-val    { color: #1e293b; font-weight: 500; }
+
+/* ── Items table ─────────────────────────────────────────────────────────── */
+.bill-preview table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
+.bill-preview thead tr { background: #6366f1; color: #fff; }
+.bill-preview thead th { padding: 10px 12px; text-align: left; font-weight: 600; }
+.bill-preview tbody tr:nth-child(even) { background: #f8fafc; }
+.bill-preview tbody td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+.bill-preview .text-right { text-align: right; }
+.bill-preview .total-row { background: #eef2ff !important; font-weight: 700; }
+.bill-preview .total-row td { border-top: 2px solid #6366f1; font-size: 14px; }
+
+/* ── Signature ───────────────────────────────────────────────────────────── */
+.sig-line {
+  margin-top: 40px; border-top: 1px solid #cbd5e1;
+  padding-top: 8px; font-size: 12px; color: #64748b; text-align: right;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.bill-footer {
+  margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;
+  display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8;
+}

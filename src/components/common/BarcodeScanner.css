@@ -1,0 +1,125 @@
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.bs-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(0,0,0,.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+
+/* ── Modal card ──────────────────────────────────────────────────────────── */
+.bs-modal {
+  background: #0f172a; border-radius: 16px;
+  width: 100%; max-width: 420px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,.6);
+  display: flex; flex-direction: column;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.bs-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.bs-title { font-size: 15px; font-weight: 600; color: #f1f5f9; }
+.bs-close {
+  background: rgba(255,255,255,.1); border: none; border-radius: 8px;
+  color: #94a3b8; cursor: pointer; padding: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, color .15s;
+}
+.bs-close:hover { background: rgba(255,255,255,.2); color: #f1f5f9; }
+
+/* ── Camera viewport ─────────────────────────────────────────────────────── */
+.bs-viewport {
+  position: relative; width: 100%; aspect-ratio: 4/3;
+  background: #000; overflow: hidden;
+  transition: box-shadow .15s;
+}
+.bs-flash { box-shadow: inset 0 0 0 4px #22c55e; }
+.bs-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Scanning line */
+.bs-scanner-line-wrap {
+  position: absolute; inset: 10%; overflow: hidden;
+  pointer-events: none;
+}
+.bs-scanner-line {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, #6366f1, #a5b4fc, #6366f1, transparent);
+  animation: scan-move 1.8s ease-in-out infinite;
+  box-shadow: 0 0 8px #6366f1;
+}
+@keyframes scan-move {
+  0%   { top: 0; }
+  50%  { top: calc(100% - 2px); }
+  100% { top: 0; }
+}
+
+/* Corner brackets */
+.bs-corner {
+  position: absolute; width: 22px; height: 22px;
+  border-color: #6366f1; border-style: solid;
+  pointer-events: none;
+}
+.bs-tl { top: 12px;  left: 12px;  border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+.bs-tr { top: 12px;  right: 12px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+.bs-bl { bottom: 12px; left: 12px;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+.bs-br { bottom: 12px; right: 12px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+/* Camera error overlay */
+.bs-cam-error {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; background: rgba(0,0,0,.8); color: #94a3b8;
+  padding: 24px; text-align: center;
+}
+.bs-cam-error p { font-size: 13px; margin: 0; line-height: 1.5; }
+
+/* ── Controls row ────────────────────────────────────────────────────────── */
+.bs-controls {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  flex-wrap: wrap;
+}
+.bs-ctrl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.08); border: none; border-radius: 7px;
+  color: #94a3b8; font-size: 12px; font-weight: 500; padding: 6px 12px;
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.bs-ctrl-btn:hover { background: rgba(255,255,255,.14); color: #f1f5f9; }
+.bs-ctrl-right { margin-left: auto; }
+.bs-cam-name {
+  font-size: 11px; color: #475569;
+  max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Manual entry ────────────────────────────────────────────────────────── */
+.bs-manual {
+  display: flex; gap: 8px; padding: 10px 14px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.bs-manual-input {
+  flex: 1; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px; padding: 9px 12px; color: #f1f5f9; font-size: 14px;
+  outline: none; transition: border-color .15s;
+}
+.bs-manual-input::placeholder { color: #475569; }
+.bs-manual-input:focus { border-color: #6366f1; }
+.bs-manual-btn {
+  background: #6366f1; border: none; border-radius: 8px;
+  color: #fff; font-size: 13px; font-weight: 600; padding: 9px 16px;
+  cursor: pointer; transition: background .15s, opacity .15s;
+  white-space: nowrap;
+}
+.bs-manual-btn:hover:not(:disabled) { background: #4f46e5; }
+.bs-manual-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Hint ────────────────────────────────────────────────────────────────── */
+.bs-hint {
+  font-size: 12px; color: #334155; text-align: center;
+  padding: 10px 14px; margin: 0;
+  border-top: 1px solid rgba(255,255,255,.04);
+}

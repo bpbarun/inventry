@@ -140,10 +140,9 @@ export function AppProvider({ children }) {
     setPurchases((p) => p.filter((po) => po.id !== id));
   };
 
-  const receivePurchase = async (id) => {
-    const res = await purchaseApi.receive(id);
+  const receivePurchase = async (id, receivedItems) => {
+    const res = await purchaseApi.receive(id, receivedItems);
     setPurchases((p) => p.map((po) => (po.id === id ? res.data : po)));
-    // Refresh stocks
     const updated = await productApi.getAll();
     setProducts(updated.data || []);
     return res.data;

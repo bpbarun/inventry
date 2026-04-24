@@ -8,7 +8,6 @@ import Login from "./components/Auth/Login";
 import { ROLE_ACCESS, ROLE_HOME } from "./config/roles";
 import "./App.css";
 
-// Redirects to the user's home page if they try to access an unauthorised route
 function RoleRoute({ path, children }) {
   const { user } = useAuth();
   const allowed = ROLE_ACCESS[user?.role] ?? [];
@@ -18,7 +17,6 @@ function RoleRoute({ path, children }) {
   return children;
 }
 
-// Route-level code splitting — each page loads only when first visited
 const Dashboard  = lazy(() => import("./components/Dashboard/Dashboard"));
 const Branches   = lazy(() => import("./components/Branch/Branches"));
 const Categories = lazy(() => import("./components/Category/Categories"));
@@ -31,45 +29,41 @@ const ImportData = lazy(() => import("./components/Import/ImportData"));
 function AppRoutes() {
   const { loading, error, loadAll } = useApp();
 
-  if (loading) {
-    return (
-      <div className="app-loading">
-        <div className="app-loading-spinner" />
-        <p>Loading inventory data…</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="app-error">
-        <h2>Could not connect to API</h2>
-        <p>{error}</p>
-        <p className="app-error-hint">
-          Make sure the CodeIgniter API is running at:<br />
-          <code>{import.meta.env.VITE_API_URL || "http://localhost/inventry-api/public/api"}</code>
-        </p>
-        <button className="btn btn-primary" onClick={loadAll}>Retry</button>
-      </div>
-    );
-  }
-
   return (
-    <Suspense fallback={<div className="app-loading"><div className="app-loading-spinner" /></div>}>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index             element={<RoleRoute path="/"><Dashboard /></RoleRoute>} />
-          <Route path="branches"   element={<RoleRoute path="/branches"><Branches /></RoleRoute>} />
-          <Route path="categories" element={<RoleRoute path="/categories"><Categories /></RoleRoute>} />
-          <Route path="products"   element={<RoleRoute path="/products"><Products /></RoleRoute>} />
-          <Route path="purchases"  element={<RoleRoute path="/purchases"><Purchases /></RoleRoute>} />
-          <Route path="stock-in"   element={<RoleRoute path="/stock-in"><StockIn /></RoleRoute>} />
-          <Route path="stock-out"  element={<RoleRoute path="/stock-out"><StockOut /></RoleRoute>} />
-          <Route path="import"     element={<RoleRoute path="/import"><ImportData /></RoleRoute>} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <>
+      {/* Non-blocking top progress bar while initial data loads */}
+      {loading && <div className="app-top-bar" />}
+
+      {error && (
+        <div className="app-error">
+          <h2>Could not connect to API</h2>
+          <p>{error}</p>
+          <p className="app-error-hint">
+            Make sure the CodeIgniter API is running at:<br />
+            <code>{import.meta.env.VITE_API_URL || "http://localhost/inventry-api/public/api"}</code>
+          </p>
+          <button className="btn btn-primary" onClick={loadAll}>Retry</button>
+        </div>
+      )}
+
+      {!error && (
+        <Suspense fallback={<div className="app-top-bar" />}>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index             element={<RoleRoute path="/"><Dashboard /></RoleRoute>} />
+              <Route path="branches"   element={<RoleRoute path="/branches"><Branches /></RoleRoute>} />
+              <Route path="categories" element={<RoleRoute path="/categories"><Categories /></RoleRoute>} />
+              <Route path="products"   element={<RoleRoute path="/products"><Products /></RoleRoute>} />
+              <Route path="purchases"  element={<RoleRoute path="/purchases"><Purchases /></RoleRoute>} />
+              <Route path="stock-in"   element={<RoleRoute path="/stock-in"><StockIn /></RoleRoute>} />
+              <Route path="stock-out"  element={<RoleRoute path="/stock-out"><StockOut /></RoleRoute>} />
+              <Route path="import"     element={<RoleRoute path="/import"><ImportData /></RoleRoute>} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      )}
+    </>
   );
 }
 
@@ -80,7 +74,6 @@ function ProtectedApp() {
     return (
       <div className="app-loading">
         <div className="app-loading-spinner" />
-        <p>Restoring session…</p>
       </div>
     );
   }

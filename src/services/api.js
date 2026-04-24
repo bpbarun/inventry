@@ -4,7 +4,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost/inventry-api/
 const toCamel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 
 const INT_FIELDS = new Set([
-  'id', 'branchId', 'categoryId', 'productId', 'purchaseId',
+  'id', 'branchId', 'categoryId', 'productId', 'purchaseId', 'parentId',
   'qty', 'stock', 'minStock', 'maxStock',
 ]);
 
@@ -125,7 +125,7 @@ export const purchaseApi = {
   create:  (data)       => request('POST',   '/purchases', data),
   update:  (id, data)   => request('PUT',    `/purchases/${id}`, data),
   remove:  (id)         => request('DELETE', `/purchases/${id}`),
-  receive: (id)         => request('POST',   `/purchases/${id}/receive`),
+  receive: (id, receivedItems) => request('POST', `/purchases/${id}/receive`, { received_items: receivedItems }),
 };
 
 // ── Stock In ──────────────────────────────────────────────────────────────────

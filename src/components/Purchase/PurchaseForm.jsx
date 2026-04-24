@@ -6,6 +6,7 @@ const today = () => new Date().toISOString().split("T")[0];
 
 const emptyItem = () => ({
   _key:        Date.now() + Math.random(),
+  parentCatId: "",
   categoryId:  "",
   productId:   "",
   orderedQty:  "",
@@ -30,19 +31,22 @@ export default function PurchaseForm({ initial = null, onSave, onCancel }) {
     if (initial?.items?.length) {
       return initial.items.map(it => {
         const prod = products.find(p => p.id === it.productId);
-        return {
-          ...it,
-          _key:       Date.now() + Math.random(),
-          categoryId: prod ? String(prod.categoryId) : "",
-        };
+        let parentCatId = "";
+        let categoryId  = "";
+        if (prod) {
+          const cat = categories.find(c => c.id === prod.categoryId);
+          parentCatId = cat?.parentId ? String(cat.parentId) : String(prod.categoryId);
+          categoryId  = String(prod.categoryId);
+        }
+        return { ...it, _key: Date.now() + Math.random(), parentCatId, categoryId };
       });
     }
     return [emptyItem()];
   });
 
-  // Categories for the selected branch (or all if branch_id not set on categories)
-  const branchCats = branchId
-    ? categories.filter(c => !c.branchId || c.branchId === parseInt(branchId))
+  // Root categories for the selected branch
+  const branchRootCats = branchId
+    ? categories.filter(c => !c.parentId && (!c.branchId || c.branchId === parseInt(branchId)))
     : [];
 
   const setItemField = (key, field, value) => {
@@ -50,7 +54,15 @@ export default function PurchaseForm({ initial = null, onSave, onCancel }) {
       prev.map(it => {
         if (it._key !== key) return it;
         const updated = { ...it, [field]: value };
-        if (field === "categoryId") { updated.productId = ""; updated.unitCost = ""; }
+        if (field === "parentCatId") {
+          updated.categoryId = value; // default to parent until sub selected
+          updated.productId  = "";
+          updated.unitCost   = "";
+        }
+        if (field === "categoryId") {
+          updated.productId = "";
+          updated.unitCost  = "";
+        }
         if (field === "productId" && value) {
           const prod = products.find(p => p.id === parseInt(value));
           if (prod) updated.unitCost = prod.costPrice;
@@ -64,10 +76,17 @@ export default function PurchaseForm({ initial = null, onSave, onCancel }) {
   const addItem    = () => setItems(prev => [...prev, emptyItem()]);
   const removeItem = (key) => setItems(prev => prev.filter(it => it._key !== key));
 
+  const itemSubCats = (item) =>
+    item.parentCatId ? categories.filter(c => c.parentId === parseInt(item.parentCatId)) : [];
+
   const itemProducts = (item) => {
     const bProds = branchId ? products.filter(p => p.branchId === parseInt(branchId)) : products;
     if (!item.categoryId) return bProds;
-    return bProds.filter(p => p.categoryId === parseInt(item.categoryId));
+    // If a subcategory is selected, filter by it; otherwise include parent + all its subs
+    const subs = categories.filter(c => c.parentId === parseInt(item.parentCatId)).map(c => c.id);
+    const isSub = subs.includes(parseInt(item.categoryId));
+    if (isSub) return bProds.filter(p => p.categoryId === parseInt(item.categoryId));
+    return bProds.filter(p => p.categoryId === parseInt(item.categoryId) || subs.includes(p.categoryId));
   };
 
   const validate = () => {
@@ -89,7 +108,7 @@ export default function PurchaseForm({ initial = null, onSave, onCancel }) {
 
     const cleanItems = items
       .filter(it => it.productId && Number(it.orderedQty) > 0)
-      .map(({ _key, categoryId, ...rest }) => ({
+      .map(({ _key, categoryId, parentCatId, ...rest }) => ({
         productId:   parseInt(rest.productId),
         orderedQty:  parseInt(rest.orderedQty),
         unitCost:    parseFloat(rest.unitCost) || 0,
@@ -195,8 +214,8 @@ export default function PurchaseForm({ initial = null, onSave, onCancel }) {
             <table className="table po-table">
               <thead>
                 <tr>
-                  <th style={{ width: "22%" }}>Category</th>
-                  <th style={{ width: "30%" }}>Product</th>
+                  <th style={{ width: "25%" }}>Category / Subcategory</th>
+                  <th style={{ width: "27%" }}>Product</th>
                   <th style={{ width: "13%" }}>Qty</th>
                   <th style={{ width: "15%" }}>Unit Cost (₹)</th>
                   <th style={{ width: "14%" }}>Line Total</th>
@@ -205,25 +224,32 @@ export default function PurchaseForm({ initial = null, onSave, onCancel }) {
               </thead>
               <tbody>
                 {items.map(item => {
-                  const selProd   = products.find(p => p.id === parseInt(item.productId));
-                  const lineTotal = (Number(item.orderedQty) || 0) * (Number(item.unitCost) || 0);
+                  const selProd    = products.find(p => p.id === parseInt(item.productId));
+                  const lineTotal  = (Number(item.orderedQty) || 0) * (Number(item.unitCost) || 0);
                   const availProds = itemProducts(item);
+                  const subs       = itemSubCats(item);
                   return (
                     <tr key={item._key} className="po-item-row">
                       <td>
-                        <select className="form-input form-input-sm" value={item.categoryId} onChange={e => setItemField(item._key, "categoryId", e.target.value)}>
+                        <select className="form-input form-input-sm" value={item.parentCatId} onChange={e => setItemField(item._key, "parentCatId", e.target.value)}>
                           <option value="">-- Category --</option>
-                          {branchCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                          {branchRootCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                         </select>
+                        {subs.length > 0 && (
+                          <select className="form-input form-input-sm" style={{ marginTop: 4 }} value={item.categoryId} onChange={e => setItemField(item._key, "categoryId", e.target.value)}>
+                            <option value={item.parentCatId}>-- No Subcategory --</option>
+                            {subs.map(s => <option key={s.id} value={s.id}>{s.icon} {s.name}</option>)}
+                          </select>
+                        )}
                       </td>
                       <td>
                         <select
                           className="form-input form-input-sm"
                           value={item.productId}
                           onChange={e => setItemField(item._key, "productId", e.target.value)}
-                          disabled={!item.categoryId}
+                          disabled={!item.parentCatId}
                         >
-                          <option value="">{item.categoryId ? "-- Select Product --" : "Select category first"}</option>
+                          <option value="">{item.parentCatId ? "-- Select Product --" : "Select category first"}</option>
                           {availProds.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
                         </select>
                         {selProd && <span className="po-stock-hint">In stock: {selProd.stock} {selProd.unit}</span>}
