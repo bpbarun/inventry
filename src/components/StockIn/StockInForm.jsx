@@ -5,7 +5,7 @@ import { useToast } from "../../context/ToastContext";
 import BarcodeScanner from "../common/BarcodeScanner";
 
 const today = () => new Date().toISOString().split("T")[0];
-const empty = { branchId: "", parentCatId: "", subCatId: "", productId: "", qty: "", supplier: "", reference: "", notes: "", date: today() };
+const empty = { branchId: "", parentCatId: "", subCatId: "", productId: "", qty: "", unitCost: "", supplier: "", reference: "", notes: "", date: today() };
 
 export default function StockInForm({ onSave, onCancel }) {
   const { branches, categories, products, addStockIn } = useApp();
@@ -81,6 +81,7 @@ export default function StockInForm({ onSave, onCancel }) {
         productId: parseInt(f.productId),
         branchId:  parseInt(f.branchId),
         qty:       parseInt(f.qty),
+        unitCost:  f.unitCost !== "" ? parseFloat(f.unitCost) : null,
         supplier:  f.supplier,
         reference: f.reference,
         notes:     f.notes,
@@ -147,6 +148,11 @@ export default function StockInForm({ onSave, onCancel }) {
             <label className="form-label">Quantity *</label>
             <input type="number" min="1" className={`form-input${err.qty ? " input-error" : ""}`} value={f.qty} onChange={e => set("qty", e.target.value)} placeholder="0" />
             {err.qty && <span className="form-error">{err.qty}</span>}
+          </div>
+          <div className="form-group">
+            <label className="form-label">Unit Cost ₹</label>
+            <input type="number" min="0" step="0.01" className="form-input" value={f.unitCost} onChange={e => set("unitCost", e.target.value)} placeholder="e.g. 250.00" />
+            <span className="form-hint">Rate per unit — used for FIFO costing</span>
           </div>
           <div className="form-group">
             <label className="form-label">Date</label>

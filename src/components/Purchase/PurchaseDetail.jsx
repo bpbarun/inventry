@@ -25,7 +25,18 @@ function ReceiveModal({ po, products, onConfirm, onClose, saving }) {
     return m;
   };
 
+  const initRates = () => {
+    const m = {};
+    (po.items || []).forEach(item => {
+      const remaining = Number(item.orderedQty) - Number(item.receivedQty);
+      m[item.id] = remaining > 0 ? String(item.unitCost || "") : "";
+    });
+    return m;
+  };
+
   const [qtys, setQtys] = useState(initQtys);
+  const [rates, setRates] = useState(initRates);
+  const [billNumber, setBillNumber] = useState("");
   const [errors, setErrors] = useState({});
 
   const set = (id, val) => {
@@ -33,25 +44,38 @@ function ReceiveModal({ po, products, onConfirm, onClose, saving }) {
     setErrors(p => ({ ...p, [id]: "" }));
   };
 
+  const setRate = (id, val) => {
+    setRates(p => ({ ...p, [id]: val }));
+    setErrors(p => ({ ...p, [`rate_${id}`]: "" }));
+  };
+
   const submit = () => {
     const errs = {};
+    if (!billNumber.trim()) errs._bill = "Bill number is required.";
     (po.items || []).forEach(item => {
       const remaining = Number(item.orderedQty) - Number(item.receivedQty);
-      const val = parseInt(qtys[item.id] ?? 0);
-      if (isNaN(val) || val < 0)       errs[item.id] = "Must be ≥ 0";
-      if (val > remaining)              errs[item.id] = `Max ${remaining}`;
+      if (remaining <= 0) return;
+      const val  = parseInt(qtys[item.id] ?? 0);
+      const rate = parseFloat(rates[item.id] ?? "");
+      if (isNaN(val) || val < 0)          errs[item.id]         = "Must be ≥ 0";
+      if (val > remaining)                 errs[item.id]         = `Max ${remaining}`;
+      if (val > 0 && (isNaN(rate) || rate <= 0)) errs[`rate_${item.id}`] = "Enter a valid rate";
     });
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     const receivedItems = (po.items || [])
-      .map(item => ({ item_id: item.id, received_qty: parseInt(qtys[item.id] ?? 0) }))
+      .map(item => ({
+        item_id:      item.id,
+        received_qty: parseInt(qtys[item.id] ?? 0),
+        unit_cost:    parseFloat(rates[item.id] ?? 0) || null,
+      }))
       .filter(r => r.received_qty > 0);
 
     if (!receivedItems.length) {
       setErrors({ _global: "Enter at least one received quantity greater than 0." });
       return;
     }
-    onConfirm(receivedItems);
+    onConfirm(receivedItems, billNumber.trim());
   };
 
   const totalNow = (po.items || []).reduce((s, item) => s + (parseInt(qtys[item.id] ?? 0) || 0), 0);
@@ -70,6 +94,21 @@ function ReceiveModal({ po, products, onConfirm, onClose, saving }) {
         <div className="rcv-body">
           {errors._global && <div className="rcv-global-err">{errors._global}</div>}
 
+          <div className="rcv-bill-row">
+            <label className="rcv-bill-label" htmlFor="rcv-bill-input">
+              Bill / Invoice Number <span style={{ color: "var(--danger)" }}>*</span>
+            </label>
+            <input
+              id="rcv-bill-input"
+              type="text"
+              className={`rcv-bill-input${errors._bill ? " rcv-qty-err" : ""}`}
+              placeholder="e.g. INV-2024-001"
+              value={billNumber}
+              onChange={e => { setBillNumber(e.target.value); setErrors(p => ({ ...p, _bill: "" })); }}
+            />
+            {errors._bill && <span className="rcv-err-msg">{errors._bill}</span>}
+          </div>
+
           <table className="rcv-table">
             <thead>
               <tr>
@@ -77,6 +116,7 @@ function ReceiveModal({ po, products, onConfirm, onClose, saving }) {
                 <th className="text-center">Ordered</th>
                 <th className="text-center">Already Received</th>
                 <th className="text-center">Remaining</th>
+                <th className="text-center">Rate (₹) *</th>
                 <th className="text-center">Receive Now *</th>
               </tr>
             </thead>
@@ -104,6 +144,21 @@ function ReceiveModal({ po, products, onConfirm, onClose, saving }) {
                       {fullyRcvd
                         ? <span className="badge badge-success">Done</span>
                         : <strong>{remaining}</strong>}
+                    </td>
+                    <td className="text-center">
+                      {fullyRcvd ? (
+                        <span className="td-meta">—</span>
+                      ) : (
+                        <div className="rcv-qty-wrap">
+                          <input
+                            type="number" min="0" step="0.01"
+                            className={`rcv-qty-input${errors[`rate_${item.id}`] ? " rcv-qty-err" : ""}`}
+                            value={rates[item.id] ?? ""}
+                            onChange={e => setRate(item.id, e.target.value)}
+                          />
+                          {errors[`rate_${item.id}`] && <span className="rcv-err-msg">{errors[`rate_${item.id}`]}</span>}
+                        </div>
+                      )}
                     </td>
                     <td className="text-center">
                       {fullyRcvd ? (
@@ -145,7 +200,7 @@ function ReceiveModal({ po, products, onConfirm, onClose, saving }) {
 
 /* ── Main PurchaseDetail ─────────────────────────────────────────────────── */
 export default function PurchaseDetail({ po, onClose }) {
-  const { branches, categories, products, receivePurchase, updatePurchase, updatePurchaseStatus } = useApp();
+  const { branches, categories, products, stockIns, receivePurchase, updatePurchase, updatePurchaseStatus } = useApp();
   const toast = useToast();
   const [showReceive,   setShowReceive]   = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -155,15 +210,34 @@ export default function PurchaseDetail({ po, onClose }) {
   const branch = branches.find(b => b.id === po.branchId);
   const orderTotal = (po.items || []).reduce((s, it) => s + Number(it.orderedQty) * Number(it.unitCost), 0);
 
+  // Flat list of stock_in lines for this PO, newest first
+  const receiptLines = stockIns
+    .filter(s => s.purchaseId === po.id)
+    .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date))
+    .map(s => {
+      const prod = products.find(p => p.id === s.productId);
+      const qty  = Number(s.qty);
+      const rate = s.unitCost != null ? Number(s.unitCost) : null;
+      return {
+        date:       s.date,
+        billNumber: s.billNumber || "—",
+        product:    s.productName || prod?.name || "—",
+        qty,
+        rate,
+        total:      rate != null ? qty * rate : null,
+        unit:       s.unit || prod?.unit || "",
+      };
+    });
+
   const canReceive = po.status === "Ordered" || po.status === "Partial";
   const canEdit    = po.status === "Draft";
   const canOrder   = po.status === "Draft";
   const canCancel  = po.status === "Draft" || po.status === "Ordered";
 
-  const handleReceive = async (receivedItems) => {
+  const handleReceive = async (receivedItems, billNumber) => {
     setSaving(true);
     try {
-      const updated = await receivePurchase(po.id, receivedItems);
+      const updated = await receivePurchase(po.id, receivedItems, billNumber);
       setShowReceive(false);
       toast.success(updated.status === "Received"
         ? "All items received. Stock updated."
@@ -210,6 +284,12 @@ export default function PurchaseDetail({ po, onClose }) {
               {po.expectedDate && <span className="td-meta">| Expected: {po.expectedDate}</span>}
               {po.receivedDate && <span className="td-meta">| Received: {po.receivedDate}</span>}
             </div>
+            {po.billNumber && (
+              <div className="po-detail-row">
+                <FileText size={14} />
+                <span><strong>Bill No:</strong> {po.billNumber}</span>
+              </div>
+            )}
             {po.notes && (
               <div className="po-detail-row">
                 <FileText size={14} />
@@ -276,6 +356,56 @@ export default function PurchaseDetail({ po, onClose }) {
             </tfoot>
           </table>
         </div>
+
+        {receiptLines.length > 0 && (
+          <div className="rcpt-history">
+            <h3 className="rcpt-history-title">Receipt History</h3>
+            <table className="rcpt-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Bill / Invoice No.</th>
+                  <th>Product</th>
+                  <th className="text-right">Rate (₹)</th>
+                  <th className="text-right">Qty</th>
+                  <th className="text-right">Total (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receiptLines.map((line, i) => (
+                  <tr key={i}>
+                    <td className="rcpt-date">{line.date}</td>
+                    <td><span className="rcpt-bill">{line.billNumber}</span></td>
+                    <td>{line.product}</td>
+                    <td className="text-right rcpt-rate">
+                      {line.rate != null ? `₹${Number(line.rate).toFixed(2)}` : "—"}
+                    </td>
+                    <td className="text-right rcpt-total">
+                      {line.qty}{line.unit ? ` ${line.unit}` : ""}
+                    </td>
+                    <td className="text-right rcpt-line-total">
+                      {line.total != null ? `₹${line.total.toFixed(2)}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={4} className="text-right rcpt-foot-label">Total Received</td>
+                  <td className="text-right rcpt-foot-total">
+                    {receiptLines.reduce((s, l) => s + l.qty, 0)}
+                  </td>
+                  <td className="text-right rcpt-foot-total">
+                    {(() => {
+                      const tot = receiptLines.reduce((s, l) => s + (l.total ?? 0), 0);
+                      return tot > 0 ? `₹${tot.toFixed(2)}` : "—";
+                    })()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
 
         <div className="po-detail-actions">
           {canEdit && (

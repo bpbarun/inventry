@@ -125,7 +125,8 @@ export const purchaseApi = {
   create:  (data)       => request('POST',   '/purchases', data),
   update:  (id, data)   => request('PUT',    `/purchases/${id}`, data),
   remove:  (id)         => request('DELETE', `/purchases/${id}`),
-  receive: (id, receivedItems) => request('POST', `/purchases/${id}/receive`, { received_items: receivedItems }),
+  receive: (id, receivedItems, billNumber) => request('POST', `/purchases/${id}/receive`, { received_items: receivedItems, bill_number: billNumber || null }),
+  // receivedItems: [{ item_id, received_qty, unit_cost }, ...]
 };
 
 // ── Stock In ──────────────────────────────────────────────────────────────────
@@ -141,7 +142,11 @@ export const stockOutApi = {
   getAll:  ()           => request('GET',    '/stock-out'),
   getOne:  (id)         => request('GET',    `/stock-out/${id}`),
   create:  (data)       => request('POST',   '/stock-out', data),
-  remove:  (id)         => request('DELETE', `/stock-out/${id}`),
+  batch:   (data)       => request('POST',   '/stock-out/batch', data),
+  update:          (id, data)   => request('PUT',    `/stock-out/${id}`, data),
+  completeWorkOrder:  (workOrder)               => request('POST', '/stock-out/complete-wo', { workOrder }),
+  dispatchWorkOrder:  (workOrder, dispatchBill) => request('POST', '/stock-out/dispatch-wo', { workOrder, dispatchBill }),
+  remove:          (id)         => request('DELETE', `/stock-out/${id}`),
 };
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────

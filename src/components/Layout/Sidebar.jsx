@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, GitBranch, Tag, Package, ShoppingCart, ArrowDownCircle, ArrowUpCircle, Upload, X } from "lucide-react";
+import { LayoutDashboard, GitBranch, Tag, Package, ShoppingCart, ArrowDownCircle, ArrowUpCircle, Upload, X, ScanSearch } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
 import { ROLE_ACCESS } from "../../config/roles";
@@ -20,7 +20,8 @@ export default function Sidebar({ open, onClose }) {
     { to: "/purchases",  icon: ShoppingCart,    label: "Purchase Orders", badge: pendingPOs > 0 ? pendingPOs : null, badgeColor: "blue" },
     { to: "/stock-in",   icon: ArrowDownCircle, label: "Stock In",        badge: null },
     { to: "/stock-out",  icon: ArrowUpCircle,   label: "Stock Out",       badge: null },
-    { to: "/import",     icon: Upload,          label: "Import Data",     badge: null },
+    { to: "/import",         icon: Upload,      label: "Import Data",    badge: null },
+    { to: "/stock-preview",  icon: ScanSearch,  label: "Stock Preview",  badge: null },
   ].filter(item => allowed.includes(item.to));
 
   return (

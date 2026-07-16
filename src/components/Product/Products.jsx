@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Edit2, Trash2, Filter, ScanLine } from "lucide-react";
+import { Plus, Edit2, Trash2, Filter, ScanLine, History } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
@@ -9,8 +9,61 @@ import EmptyState from "../common/EmptyState";
 import DataTable from "../common/DataTable";
 import BarcodeScanner from "../common/BarcodeScanner";
 
+/* ── Rate History Modal ──────────────────────────────────────────────────── */
+function RateHistoryModal({ product, stockIns, onClose }) {
+  const lines = stockIns
+    .filter(s => s.productId === product.id)
+    .sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+
+  const totalQty   = lines.reduce((s, l) => s + Number(l.qty), 0);
+  const totalValue = lines.reduce((s, l) => s + (l.unitCost != null ? Number(l.qty) * Number(l.unitCost) : 0), 0);
+
+  return (
+    <Modal title={`Rate History — ${product.name}`} onClose={onClose} size="lg">
+      {lines.length === 0 ? (
+        <p style={{ padding: "24px", textAlign: "center", color: "var(--text-sub)" }}>No stock-in records found for this product.</p>
+      ) : (
+        <table className="rcpt-table" style={{ width: "100%" }}>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Bill / Invoice No.</th>
+              <th className="text-right">Qty</th>
+              <th className="text-right">Rate (₹)</th>
+              <th className="text-right">Total (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((s, i) => {
+              const rate  = s.unitCost != null ? Number(s.unitCost) : null;
+              const total = rate != null ? Number(s.qty) * rate : null;
+              return (
+                <tr key={i}>
+                  <td className="rcpt-date">{s.date}</td>
+                  <td><span className="rcpt-bill">{s.billNumber || "—"}</span></td>
+                  <td className="text-right rcpt-total">{s.qty}{product.unit ? ` ${product.unit}` : ""}</td>
+                  <td className="text-right rcpt-rate">{rate != null ? `₹${rate.toFixed(2)}` : "—"}</td>
+                  <td className="text-right rcpt-line-total">{total != null ? `₹${total.toFixed(2)}` : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={2} className="text-right rcpt-foot-label">Total</td>
+              <td className="text-right rcpt-foot-total">{totalQty}{product.unit ? ` ${product.unit}` : ""}</td>
+              <td className="rcpt-foot-label" />
+              <td className="text-right rcpt-foot-total">{totalValue > 0 ? `₹${totalValue.toFixed(2)}` : "—"}</td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </Modal>
+  );
+}
+
 export default function Products() {
-  const { branches, categories, products, addProduct, updateProduct, deleteProduct } = useApp();
+  const { branches, categories, products, stockIns, addProduct, updateProduct, deleteProduct } = useApp();
   const toast = useToast();
 
   const [filterB, setFilterB]   = useState("all");
@@ -22,6 +75,7 @@ export default function Products() {
   const [delItem, setDelItem]   = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanHighlight, setScanHighlight] = useState(null); // product id
+  const [rateHistoryItem, setRateHistoryItem] = useState(null);
 
   const handleScan = (value) => {
     setScanning(false);
@@ -97,7 +151,13 @@ export default function Products() {
     },
     {
       key: "costPrice", label: "Cost (₹)", sortable: true,
-      render: r => <span className="td-price">₹{Number(r.costPrice).toFixed(2)}</span>,
+      stopClick: true,
+      render: r => (
+        <button className="rate-history-btn" onClick={() => setRateHistoryItem(r)} title="View rate history">
+          <span className="td-price">₹{Number(r.costPrice).toFixed(2)}</span>
+          <History size={11} className="rate-history-icon" />
+        </button>
+      ),
       exportValue: r => Number(r.costPrice).toFixed(2),
     },
     {
@@ -232,6 +292,13 @@ export default function Products() {
             catch (e) { toast.error(e.message || "Failed to delete product."); setDelItem(null); }
           }}
           onCancel={() => setDelItem(null)} />
+      )}
+      {rateHistoryItem && (
+        <RateHistoryModal
+          product={rateHistoryItem}
+          stockIns={stockIns}
+          onClose={() => setRateHistoryItem(null)}
+        />
       )}
     </div>
   );
