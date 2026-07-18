@@ -105,7 +105,38 @@ a { color:var(--primary); text-decoration:none; }
   background:var(--danger); color:#fff; font-size:9px; font-weight:700;
   min-width:15px; height:15px; border-radius:8px;
   display:flex; align-items:center; justify-content:center; padding:0 3px;
+  pointer-events:none;
 }
+
+/* ── Notification dropdown ─────────────────────────────────────── */
+.notif-panel {
+  position:fixed; top:calc(var(--nh) + 8px); right:16px;
+  width:320px; max-height:420px;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.18);
+  z-index:9999; overflow:hidden;
+  display:flex; flex-direction:column;
+}
+.notif-panel-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-bottom:1px solid var(--border);
+  font-size:13px; font-weight:700; color:var(--text); flex-shrink:0;
+  background:var(--surface);
+}
+.notif-panel-body   { overflow-y:auto; flex:1; background:var(--surface); }
+.notif-empty        { padding:32px 16px; text-align:center; color:var(--text-sub); font-size:13px; }
+.notif-item {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 16px; border-bottom:1px solid var(--border);
+  transition:background .1s; background:var(--surface);
+}
+.notif-item:last-child  { border-bottom:none; }
+.notif-item:hover       { background:var(--bg); }
+.notif-item-icon        { flex-shrink:0; }
+.notif-item-body        { flex:1; min-width:0; }
+.notif-item-name        { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.notif-item-meta        { font-size:11px; color:var(--text-sub); margin-top:2px; }
+.notif-item-badge       { flex-shrink:0; }
 .avatar {
   width:34px; height:34px; border-radius:50%;
   background:linear-gradient(135deg,var(--primary),var(--purple));
@@ -177,6 +208,19 @@ a { color:var(--primary); text-decoration:none; }
 .bos-val { display:block; font-size:16px; font-weight:700; }
 .bos-lbl { display:block; font-size:10px; color:var(--text-meta); text-transform:uppercase; }
 .dash-bottom { display:flex; flex-direction:column; gap:16px; }
+.dash-section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.dash-section-header .card-title { margin-bottom:0; }
+
+.dash-filters { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.dash-search-box { position:relative; flex:1; min-width:160px; }
+.dash-search-icon { position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text-meta); pointer-events:none; }
+.dash-search-input { width:100%; padding:6px 28px 6px 28px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--surface); color:var(--text); outline:none; }
+.dash-search-input:focus { border-color:var(--primary); }
+.dash-search-clear { position:absolute; right:7px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--text-meta); padding:2px; display:flex; align-items:center; }
+
+.dash-pager { display:flex; align-items:center; gap:6px; padding:10px 14px 2px; border-top:1px solid var(--border); margin-top:4px; }
+.dash-pager-count { font-size:12px; color:var(--text-sub); flex:1; }
+.dash-pager-pages { font-size:12px; color:var(--text-sub); min-width:40px; text-align:center; }
 .mv-in  { background:#dcfce7; color:#15803d; font-weight:700; padding:2px 8px; border-radius:12px; font-size:12px; }
 .mv-out { background:#fef3c7; color:#b45309; font-weight:700; padding:2px 8px; border-radius:12px; font-size:12px; }
 
@@ -269,6 +313,14 @@ a { color:var(--primary); text-decoration:none; }
 .search-input::placeholder { color:var(--text-meta); }
 .filter-group { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .filter-count { font-size:12px; color:var(--text-meta); margin-left:auto; white-space:nowrap; }
+
+/* ── Bulk action bar ──────────────────────────────────────────────────────── */
+.bulk-action-bar   { display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--primary-light, #eff0ff); border:1px solid #c7d2fe; border-radius:8px; margin-bottom:4px; }
+.bulk-action-count { font-size:13px; font-weight:600; color:#4f46e5; flex:1; }
+
+/* ── DataTable selected row ───────────────────────────────────────────────── */
+.dt-row-selected    { background:#f5f3ff !important; }
+.dt-row-selected td { border-bottom-color:#e0e7ff !important; }
 .select-sm { padding:6px 10px !important; font-size:12px !important; height:34px; }
 
 /* ── Modal ───────────────────────────────────────────────────── */

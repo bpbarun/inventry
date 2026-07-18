@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Plus, Trash2, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { Plus, Trash2, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronRight, ClipboardList, Pencil, Check, X } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
 let _key = 0;
@@ -98,6 +98,26 @@ export default function StockPreview() {
 
   const toggleWO = (id) =>
     setWorkOrders(p => p.map(wo => wo._id === id ? { ...wo, open: !wo.open } : wo));
+
+  // ── Rename work order ─────────────────────────────────────────────────────
+  const [renamingId,  setRenamingId]  = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef(null);
+
+  const startRename = (wo, e) => {
+    e.stopPropagation();
+    setRenamingId(wo._id);
+    setRenameValue(wo.name);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  };
+
+  const confirmRename = () => {
+    const name = renameValue.trim();
+    if (name) setWorkOrders(p => p.map(wo => wo._id === renamingId ? { ...wo, name } : wo));
+    setRenamingId(null);
+  };
+
+  const cancelRename = () => setRenamingId(null);
 
   // ── Row actions inside a WO ───────────────────────────────────────────────
   const setRowField = (woId, key, field, val) =>
@@ -242,7 +262,20 @@ export default function StockPreview() {
                     ? <ChevronDown size={16} style={{ color: "#6366f1", flexShrink: 0 }} />
                     : <ChevronRight size={16} style={{ color: "var(--text-sub)", flexShrink: 0 }} />
                   }
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{wo.name}</span>
+                  {renamingId === wo._id ? (
+                    <input
+                      ref={renameInputRef}
+                      className="form-input form-input-sm"
+                      style={{ width: 200, fontWeight: 700 }}
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") confirmRename(); if (e.key === "Escape") cancelRename(); }}
+                      onBlur={confirmRename}
+                      onClick={e => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>{wo.name}</span>
+                  )}
 
                   {results.length > 0 && (
                     <>
@@ -268,6 +301,14 @@ export default function StockPreview() {
                   )}
                 </div>
                 <div className="wo-card-right">
+                  {renamingId === wo._id ? (
+                    <>
+                      <button className="icon-btn icon-btn-green" title="Save name" onClick={e => { e.stopPropagation(); confirmRename(); }}><Check size={14} /></button>
+                      <button className="icon-btn" title="Cancel" onClick={e => { e.stopPropagation(); cancelRename(); }}><X size={14} /></button>
+                    </>
+                  ) : (
+                    <button className="icon-btn" title="Rename work order" onClick={e => startRename(wo, e)}><Pencil size={14} /></button>
+                  )}
                   <button
                     className="icon-btn icon-btn-red"
                     title="Remove work order"

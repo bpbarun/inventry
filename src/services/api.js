@@ -134,6 +134,7 @@ export const stockInApi = {
   getAll:  ()           => request('GET',    '/stock-in'),
   getOne:  (id)         => request('GET',    `/stock-in/${id}`),
   create:  (data)       => request('POST',   '/stock-in', data),
+  update:  (id, data)   => request('PUT',    `/stock-in/${id}`, data),
   remove:  (id)         => request('DELETE', `/stock-in/${id}`),
 };
 

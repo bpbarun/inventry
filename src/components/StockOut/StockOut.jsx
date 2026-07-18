@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, ChevronDown, ChevronRight, Filter, FileText, Check, X, CheckCircle2, Truck } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Filter, FileText, Check, X, CheckCircle2, Truck, Pencil } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
@@ -29,6 +29,32 @@ export default function StockOut() {
   const [dispatchModal,   setDispatchModal]   = useState(null); // workOrder string
   const [dispatchBillVal, setDispatchBillVal] = useState("");
   const [dispatching,     setDispatching]     = useState(false);
+
+  // inline item qty edit
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editItemQty,   setEditItemQty]   = useState("");
+  const [editItemSaving, setEditItemSaving] = useState(false);
+
+  const startEditItem = (it) => { setEditingItemId(it.id); setEditItemQty(String(it.qty)); };
+  const cancelEditItem = () => { setEditingItemId(null); setEditItemQty(""); };
+
+  const saveEditItem = async (it) => {
+    const qty = parseInt(editItemQty);
+    if (!qty || qty <= 0) return toast.error("Enter a valid quantity.");
+    const prod = products.find(p => p.id === it.productId);
+    const maxAllowed = Number(it.qty) + Number(prod?.stock ?? 0);
+    if (qty > maxAllowed) return toast.error(`Max allowed: ${maxAllowed} units.`);
+    setEditItemSaving(true);
+    try {
+      await updateStockOut(it.id, { qty });
+      toast.success("Quantity updated.");
+      cancelEditItem();
+    } catch (e) {
+      toast.error(e.message || "Failed to update.");
+    } finally {
+      setEditItemSaving(false);
+    }
+  };
 
   const toggleGroup = (key) =>
     setOpenGroups(prev => {
@@ -288,6 +314,7 @@ export default function StockOut() {
                           <th className="text-right">Qty</th>
                           <th className="text-right">Rate (₹)</th>
                           <th className="text-right">Amount (₹)</th>
+                          {activeTab === "running" && <th style={{ width: 44 }}></th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -299,6 +326,7 @@ export default function StockOut() {
                             ? Number(it.totalCost)
                             : (Number(prod?.costPrice || 0) > 0 ? Number(it.qty) * Number(prod.costPrice) : null);
                           const unitRate = amount != null && Number(it.qty) > 0 ? amount / Number(it.qty) : null;
+                          const isEditingThis = editingItemId === it.id;
                           return (
                             <tr key={it.id}>
                               <td><p className="td-name">{it.productName || prod?.name || "—"}</p></td>
@@ -309,7 +337,23 @@ export default function StockOut() {
                                 )}
                               </td>
                               <td className="text-right">
-                                <span className="mv-out">−{it.qty} {it.unit || prod?.unit || ""}</span>
+                                {isEditingThis ? (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                                    <input
+                                      type="number" min="1"
+                                      className="form-input form-input-sm"
+                                      style={{ width: 72, textAlign: "right" }}
+                                      value={editItemQty}
+                                      onChange={e => setEditItemQty(e.target.value)}
+                                      onKeyDown={e => { if (e.key === "Enter") saveEditItem(it); if (e.key === "Escape") cancelEditItem(); }}
+                                      autoFocus
+                                    />
+                                    <button className="icon-btn icon-btn-green" title="Save" disabled={editItemSaving} onClick={() => saveEditItem(it)}><Check size={13} /></button>
+                                    <button className="icon-btn" title="Cancel" onClick={cancelEditItem}><X size={13} /></button>
+                                  </div>
+                                ) : (
+                                  <span className="mv-out">−{it.qty} {it.unit || prod?.unit || ""}</span>
+                                )}
                               </td>
                               <td className="text-right">
                                 <span className={isFifo ? "td-rate-fifo" : "td-meta"}>
@@ -319,6 +363,15 @@ export default function StockOut() {
                               <td className="text-right" style={{ fontWeight: isFifo ? 600 : 400, color: isFifo ? "var(--text)" : "var(--text-sub)" }}>
                                 {amount != null ? fmt(amount) : "—"}
                               </td>
+                              {activeTab === "running" && (
+                                <td className="text-center">
+                                  {!isEditingThis && (
+                                    <button className="icon-btn" title="Edit qty" onClick={() => startEditItem(it)}>
+                                      <Pencil size={14} />
+                                    </button>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
@@ -368,6 +421,7 @@ export default function StockOut() {
                           <td className="text-right" style={{ padding: "8px 12px", fontWeight: 700 }}>{groupQty} units</td>
                           <td />
                           <td className="text-right" style={{ padding: "8px 12px", fontWeight: 700, color: "var(--text)" }}>{hasGroupCost && groupAmount > 0 ? fmt(groupAmount) : "—"}</td>
+                          {activeTab === "running" && <td />}
                         </tr>
                       </tfoot>
                     </table>

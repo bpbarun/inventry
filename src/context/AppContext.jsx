@@ -113,6 +113,14 @@ export function AppProvider({ children }) {
     return res.data;
   };
 
+  const updateStockIn = async (id, data) => {
+    const res = await stockInApi.update(id, data);
+    setStockIns((p) => p.map((si) => (si.id === id ? res.data : si)));
+    const updated = await productApi.getAll();
+    setProducts(updated.data || []);
+    return res.data;
+  };
+
   // ── Stock Out ────────────────────────────────────────────────────────────
   const addStockOut = async (data) => {
     const res = await stockOutApi.create(data);
@@ -225,7 +233,7 @@ export function AppProvider({ children }) {
         addBranch, updateBranch, deleteBranch,
         addCategory, updateCategory, deleteCategory,
         addProduct, updateProduct, deleteProduct,
-        addStockIn, addStockOut, addStockOutBatch, updateStockOut, completeWorkOrder, dispatchWorkOrder,
+        addStockIn, updateStockIn, addStockOut, addStockOutBatch, updateStockOut, completeWorkOrder, dispatchWorkOrder,
         addPurchase, updatePurchase, deletePurchase, receivePurchase, updatePurchaseStatus,
         getBranch, getCategory, getProduct,
         branchCategories, categoryProducts, branchProducts,

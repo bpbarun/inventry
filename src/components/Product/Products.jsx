@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Edit2, Trash2, Filter, ScanLine, History } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useToast } from "../../context/ToastContext";
@@ -67,15 +67,37 @@ export default function Products() {
   const toast = useToast();
 
   const [filterB, setFilterB]   = useState("all");
-  const [filterC, setFilterC]   = useState("all"); // root category
-  const [filterSub, setFilterSub] = useState("all"); // subcategory
+  const [filterC, setFilterC]   = useState("all");
+  const [filterSub, setFilterSub] = useState("all");
   const [filterS, setFilterS]   = useState("all");
   const [showAdd, setShowAdd]   = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [delItem, setDelItem]   = useState(null);
   const [scanning, setScanning] = useState(false);
-  const [scanHighlight, setScanHighlight] = useState(null); // product id
+  const [scanHighlight, setScanHighlight] = useState(null);
   const [rateHistoryItem, setRateHistoryItem] = useState(null);
+
+  // ── Multi-select ────────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [confirmBulkDel, setConfirmBulkDel] = useState(false);
+  const [bulkDeleting,   setBulkDeleting]   = useState(false);
+
+  // Clear selection when filters change
+  useEffect(() => { setSelectedIds(new Set()); }, [filterB, filterC, filterSub, filterS]);
+
+  const doBulkDelete = async () => {
+    setBulkDeleting(true);
+    let failed = 0;
+    for (const id of selectedIds) {
+      try { await deleteProduct(id); }
+      catch { failed++; }
+    }
+    setBulkDeleting(false);
+    setConfirmBulkDel(false);
+    setSelectedIds(new Set());
+    if (failed > 0) toast.error(`${failed} product(s) could not be deleted.`);
+    else toast.success(`${selectedIds.size} product(s) deleted.`);
+  };
 
   const handleScan = (value) => {
     setScanning(false);
@@ -246,6 +268,19 @@ export default function Products() {
         <span className="filter-count">{filtered.length} results</span>
       </div>
 
+      {/* ── Bulk action bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-action-count">{selectedIds.size} product{selectedIds.size !== 1 ? "s" : ""} selected</span>
+          <button className="btn btn-danger btn-sm" onClick={() => setConfirmBulkDel(true)}>
+            <Trash2 size={13} /> Delete Selected
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={() => setSelectedIds(new Set())}>
+            Clear Selection
+          </button>
+        </div>
+      )}
+
       {products.length === 0 ? (
         <EmptyState icon="📦" title="No products yet" subtitle="Add your first product to start tracking inventory."
           action={<button className="btn btn-primary" onClick={() => setShowAdd(true)}><Plus size={14} /> Add Product</button>} />
@@ -258,6 +293,9 @@ export default function Products() {
             defaultPageSize={10}
             emptyMessage="No products match your filters."
             rowClassName={r => r.id === scanHighlight ? "row-scan-highlight" : ""}
+            selectable
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
           />
         </div>
       )}
@@ -292,6 +330,16 @@ export default function Products() {
             catch (e) { toast.error(e.message || "Failed to delete product."); setDelItem(null); }
           }}
           onCancel={() => setDelItem(null)} />
+      )}
+      {confirmBulkDel && (
+        <ConfirmDialog
+          title="Delete Selected Products"
+          message={`Permanently delete ${selectedIds.size} product${selectedIds.size !== 1 ? "s" : ""}? This cannot be undone.`}
+          danger
+          onConfirm={doBulkDelete}
+          onCancel={() => setConfirmBulkDel(false)}
+          confirmLabel={bulkDeleting ? "Deleting…" : `Delete ${selectedIds.size} Product${selectedIds.size !== 1 ? "s" : ""}`}
+        />
       )}
       {rateHistoryItem && (
         <RateHistoryModal

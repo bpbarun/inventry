@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search, ChevronUp, ChevronDown, ChevronsUpDown,
   Download, ChevronLeft, ChevronRight, FileSpreadsheet, FileText,
@@ -36,6 +36,10 @@ export default function DataTable({
   onRowClick,
   rowClassName,
   extraToolbar,
+  // ── Multi-select ──
+  selectable = false,
+  selectedIds,        // Set<id>
+  onSelectionChange,  // (newSet: Set) => void
 }) {
   const [sort, setSort]     = useState({ key: null, dir: "asc" });
   const [page, setPage]     = useState(1);
@@ -142,6 +146,31 @@ export default function DataTable({
       return acc;
     }, []);
 
+  // ── Selection helpers ─────────────────────────────────────────────────────
+  const selectAllRef = useRef(null);
+  const pageIds = paginated.map(r => r.id).filter(Boolean);
+  const allPageSelected  = selectable && pageIds.length > 0 && pageIds.every(id => selectedIds?.has(id));
+  const somePageSelected = selectable && pageIds.some(id => selectedIds?.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = somePageSelected && !allPageSelected;
+    }
+  }, [somePageSelected, allPageSelected]);
+
+  const toggleSelectAll = () => {
+    const next = new Set(selectedIds);
+    if (allPageSelected) pageIds.forEach(id => next.delete(id));
+    else pageIds.forEach(id => next.add(id));
+    onSelectionChange?.(next);
+  };
+
+  const toggleSelectRow = (id) => {
+    const next = new Set(selectedIds);
+    next.has(id) ? next.delete(id) : next.add(id);
+    onSelectionChange?.(next);
+  };
+
   // ── Sort icon ─────────────────────────────────────────────────────────────
   const SortIcon = ({ colKey }) => {
     if (sort.key !== colKey)
@@ -200,6 +229,17 @@ export default function DataTable({
         <table className="table dt-table">
           <thead>
             <tr>
+              {selectable && (
+                <th style={{ width: 40, textAlign: "center" }}>
+                  <input
+                    type="checkbox"
+                    ref={selectAllRef}
+                    checked={allPageSelected}
+                    onChange={toggleSelectAll}
+                    title="Select all on this page"
+                  />
+                </th>
+              )}
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -218,15 +258,28 @@ export default function DataTable({
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="empty-row">{emptyMessage}</td>
+                <td colSpan={selectable ? columns.length + 1 : columns.length} className="empty-row">{emptyMessage}</td>
               </tr>
             ) : (
               paginated.map((row, idx) => (
                 <tr
                   key={row.id ?? idx}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={[onRowClick ? "dt-row-clickable" : "", rowClassName?.(row) ?? ""].filter(Boolean).join(" ")}
+                  className={[
+                    onRowClick ? "dt-row-clickable" : "",
+                    rowClassName?.(row) ?? "",
+                    selectable && selectedIds?.has(row.id) ? "dt-row-selected" : "",
+                  ].filter(Boolean).join(" ")}
                 >
+                  {selectable && (
+                    <td style={{ textAlign: "center", width: 40 }} onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds?.has(row.id) ?? false}
+                        onChange={() => toggleSelectRow(row.id)}
+                      />
+                    </td>
+                  )}
                   {columns.map((col) => (
                     <td key={col.key} style={col.tdStyle} onClick={col.stopClick ? (e) => e.stopPropagation() : undefined}>
                       {col.render
