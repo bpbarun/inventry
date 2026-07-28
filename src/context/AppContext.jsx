@@ -1,40 +1,43 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import {
   branchApi, categoryApi, productApi,
-  purchaseApi, stockInApi, stockOutApi,
+  purchaseApi, stockInApi, stockOutApi, previewOrderApi,
 } from "../services/api";
 
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-  const [branches,   setBranches]   = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [products,   setProducts]   = useState([]);
-  const [stockIns,   setStockIns]   = useState([]);
-  const [stockOuts,  setStockOuts]  = useState([]);
-  const [purchases,  setPurchases]  = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(null);
+  const [branches,       setBranches]       = useState([]);
+  const [categories,     setCategories]     = useState([]);
+  const [products,       setProducts]       = useState([]);
+  const [stockIns,       setStockIns]       = useState([]);
+  const [stockOuts,      setStockOuts]      = useState([]);
+  const [purchases,      setPurchases]      = useState([]);
+  const [previewOrders,  setPreviewOrders]  = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState(null);
 
   // ── Initial data load ────────────────────────────────────────────────────
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [b, cat, prod, po, si, so] = await Promise.all([
+      const [b, cat, prod, po, si, so, prev] = await Promise.all([
         branchApi.getAll(),
         categoryApi.getAll(),
         productApi.getAll(),
         purchaseApi.getAll(),
         stockInApi.getAll(),
         stockOutApi.getAll(),
+        previewOrderApi.getAll(),
       ]);
-      setBranches(b.data   || []);
-      setCategories(cat.data || []);
-      setProducts(prod.data  || []);
-      setPurchases(po.data   || []);
-      setStockIns(si.data    || []);
-      setStockOuts(so.data   || []);
+      setBranches(b.data       || []);
+      setCategories(cat.data   || []);
+      setProducts(prod.data    || []);
+      setPurchases(po.data     || []);
+      setStockIns(si.data      || []);
+      setStockOuts(so.data     || []);
+      setPreviewOrders(prev.data || []);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -197,6 +200,24 @@ export function AppProvider({ children }) {
     return res.data;
   };
 
+  // ── Preview Orders ────────────────────────────────────────────────────────
+  const addPreviewOrder = async (data) => {
+    const res = await previewOrderApi.create(data);
+    setPreviewOrders((p) => [res.data, ...p]);
+    return res.data;
+  };
+
+  const updatePreviewOrder = async (id, data) => {
+    const res = await previewOrderApi.update(id, data);
+    setPreviewOrders((p) => p.map((po) => (po.id === id ? res.data : po)));
+    return res.data;
+  };
+
+  const deletePreviewOrder = async (id) => {
+    await previewOrderApi.remove(id);
+    setPreviewOrders((p) => p.filter((po) => po.id !== id));
+  };
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getBranch   = (id) => branches.find((b) => b.id === +id);
   const getCategory = (id) => categories.find((c) => c.id === +id);
@@ -228,13 +249,14 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider
       value={{
-        branches, categories, products, stockIns, stockOuts, purchases,
+        branches, categories, products, stockIns, stockOuts, purchases, previewOrders,
         loading, error, loadAll,
         addBranch, updateBranch, deleteBranch,
         addCategory, updateCategory, deleteCategory,
         addProduct, updateProduct, deleteProduct,
         addStockIn, updateStockIn, addStockOut, addStockOutBatch, updateStockOut, completeWorkOrder, dispatchWorkOrder,
         addPurchase, updatePurchase, deletePurchase, receivePurchase, updatePurchaseStatus,
+        addPreviewOrder, updatePreviewOrder, deletePreviewOrder,
         getBranch, getCategory, getProduct,
         branchCategories, categoryProducts, branchProducts,
         lowStockProducts, totalInventoryValue,

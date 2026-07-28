@@ -159,3 +159,11 @@ export const dashboardApi = {
 export const importApi = {
   products: (rows) => request('POST', '/import/products', { rows }),
 };
+
+// ── Preview Orders ────────────────────────────────────────────────────────────
+export const previewOrderApi = {
+  getAll:  ()           => request('GET',    '/preview-orders'),
+  create:  (data)       => request('POST',   '/preview-orders', data),
+  update:  (id, data)   => request('PUT',    `/preview-orders/${id}`, data),
+  remove:  (id)         => request('DELETE', `/preview-orders/${id}`),
+};

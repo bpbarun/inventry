@@ -6,7 +6,7 @@ import Modal from "../common/Modal";
 import StockOutForm from "./StockOutForm";
 
 export default function StockOut() {
-  const { stockOuts, products, branches, categories, addStockOut, addStockOutBatch, completeWorkOrder, dispatchWorkOrder } = useApp();
+  const { stockOuts, products, branches, categories, addStockOut, addStockOutBatch, updateStockOut, completeWorkOrder, dispatchWorkOrder } = useApp();
   const toast = useToast();
 
   const [activeTab,     setActiveTab]     = useState("running");
@@ -20,6 +20,8 @@ export default function StockOut() {
   const [newProdId,     setNewProdId]     = useState("");
   const [newQty,        setNewQty]        = useState("");
   const [addSaving,     setAddSaving]     = useState(false);
+  const [addCatId,      setAddCatId]      = useState("");
+  const [addSubCatId,   setAddSubCatId]   = useState("");
 
   // complete work order confirmation
   const [confirmComplete, setConfirmComplete] = useState(null); // workOrder string
@@ -68,8 +70,16 @@ export default function StockOut() {
     setAddingToGroup(groupKey);
     setNewProdId("");
     setNewQty("");
+    setAddCatId("");
+    setAddSubCatId("");
   };
-  const cancelAddItem = () => { setAddingToGroup(null); setNewProdId(""); setNewQty(""); };
+  const cancelAddItem = () => {
+    setAddingToGroup(null);
+    setNewProdId("");
+    setNewQty("");
+    setAddCatId("");
+    setAddSubCatId("");
+  };
 
   const saveAddItem = async (group) => {
     const qty  = parseInt(newQty);
@@ -267,6 +277,25 @@ export default function StockOut() {
             const usedIds    = new Set(group.items.map(it => it.productId));
             const availProds = addableProds.filter(p => !usedIds.has(p.id));
 
+            // category / subcategory filter for inline add
+            const addRootCats = categories.filter(c =>
+              !c.parentId && addableProds.some(p => {
+                const cat = categories.find(x => x.id === p.categoryId);
+                return p.categoryId === c.id || (cat && cat.parentId === c.id);
+              })
+            );
+            const addSubCats = addCatId
+              ? categories.filter(c => c.parentId === parseInt(addCatId))
+              : [];
+            const addCatFilterIds = addSubCatId
+              ? [parseInt(addSubCatId)]
+              : addCatId
+                ? [parseInt(addCatId), ...categories.filter(c => c.parentId === parseInt(addCatId)).map(c => c.id)]
+                : null;
+            const filteredAvailProds = addCatFilterIds
+              ? availProds.filter(p => addCatFilterIds.includes(p.categoryId))
+              : availProds;
+
             return (
               <div key={group.key} className={`wo-card${isOpen ? " wo-card-open" : ""}`}>
                 {/* Header */}
@@ -376,6 +405,40 @@ export default function StockOut() {
                           );
                         })}
 
+                        {/* inline add-product filter row */}
+                        {isAdding && (
+                          <tr>
+                            <td colSpan={7} style={{ padding: "10px 12px 4px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-sub)", flexShrink: 0 }}>Category:</span>
+                                <select
+                                  className="form-input select-sm"
+                                  style={{ minWidth: 160 }}
+                                  value={addCatId}
+                                  onChange={e => { setAddCatId(e.target.value); setAddSubCatId(""); setNewProdId(""); }}
+                                >
+                                  <option value="">— All Categories —</option>
+                                  {addRootCats.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                                </select>
+                                {addSubCats.length > 0 && (
+                                  <>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-sub)", flexShrink: 0 }}>Sub:</span>
+                                    <select
+                                      className="form-input select-sm"
+                                      style={{ minWidth: 150 }}
+                                      value={addSubCatId}
+                                      onChange={e => { setAddSubCatId(e.target.value); setNewProdId(""); }}
+                                    >
+                                      <option value="">— All Subcategories —</option>
+                                      {addSubCats.map(s => <option key={s.id} value={s.id}>{s.icon} {s.name}</option>)}
+                                    </select>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
                         {/* inline add-product row */}
                         {isAdding && (
                           <tr className="wo-add-row">
@@ -388,7 +451,7 @@ export default function StockOut() {
                                 autoFocus
                               >
                                 <option value="">— Select product —</option>
-                                {availProds.map(p => (
+                                {filteredAvailProds.map(p => (
                                   <option key={p.id} value={p.id}>
                                     {p.name} ({p.sku}) — {p.stock} in stock
                                   </option>
