@@ -870,3 +870,18 @@ a { color:var(--primary); text-decoration:none; }
 .prev-row-low           { background: #fffbeb; }
 .prev-row-low td        { border-bottom-color: #fef3c7; }
 .prev-remaining         { font-weight: 700; }
+
+/* ── Reports ─────────────────────────────────────────────────── */
+.rpt-actions       { display: flex; gap: 8px; }
+.rpt-tab-bar       { flex-wrap: wrap; }
+.rpt-filters       { row-gap: 8px; }
+.rpt-check         { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-sub); cursor: pointer; white-space: nowrap; }
+.rpt-check input   { cursor: pointer; }
+
+.rpt-summary       { display: flex; flex-wrap: wrap; gap: 28px; padding: 16px 20px; }
+.rpt-stat          { display: flex; flex-direction: column; gap: 2px; }
+.rpt-stat-label    { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-sub); font-weight: 600; }
+.rpt-stat-value    { font-size: 19px; font-weight: 700; color: var(--text); }
+
+.rpt-detail-row > td      { background: #f8fafc; }
+.rpt-detail-row .table th { background: #f1f5f9; }

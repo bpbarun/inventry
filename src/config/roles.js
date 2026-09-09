@@ -2,7 +2,7 @@
 // Add a role here when you add one to the backend.
 
 export const ROLE_ACCESS = {
-  admin:  ['/', '/branches', '/categories', '/products', '/purchases', '/stock-in', '/stock-out', '/import', '/stock-preview'],
+  admin:  ['/', '/branches', '/categories', '/products', '/purchases', '/stock-in', '/stock-out', '/import', '/stock-preview', '/reports'],
   seller: ['/stock-out', '/stock-preview'],
   buyer:  ['/purchases', '/stock-in'],
 };

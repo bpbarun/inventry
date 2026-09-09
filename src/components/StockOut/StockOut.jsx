@@ -129,6 +129,7 @@ export default function StockOut() {
       toast.success(`Work order ${dispatchModal} dispatched — Bill: ${dispatchBillVal.trim()}`);
       setDispatchModal(null);
       setDispatchBillVal("");
+      setActiveTab("dispatched");
     } catch (e) {
       toast.error(e.message || "Failed to dispatch.");
     } finally {
@@ -163,7 +164,12 @@ export default function StockOut() {
     });
 
     return [...map.values()]
-      .filter(g => g.status === activeTab)
+      .filter(g => {
+        if (activeTab === "running")    return (g.status || "running") === "running";
+        if (activeTab === "completed")  return g.status === "completed" && !g.dispatchBill;
+        if (activeTab === "dispatched") return !!g.dispatchBill;
+        return false;
+      })
       .filter(g =>
         !search.trim() ||
         g.workOrder?.toLowerCase().includes(search.toLowerCase()) ||
@@ -178,9 +184,16 @@ export default function StockOut() {
   }, [stockOuts]);
 
   const completedCount = useMemo(() => {
-    const keys = new Set(stockOuts.filter(s => s.status === "completed").map(s => s.workOrder || `__solo_${s.id}`));
+    const keys = new Set(stockOuts.filter(s => s.status === "completed" && !s.dispatchBill).map(s => s.workOrder || `__solo_${s.id}`));
     return keys.size;
   }, [stockOuts]);
+
+  const dispatchedCount = useMemo(() => {
+    const keys = new Set(stockOuts.filter(s => !!s.dispatchBill).map(s => s.workOrder || `__solo_${s.id}`));
+    return keys.size;
+  }, [stockOuts]);
+
+  const tabLabel = { running: "running", completed: "finish good", dispatched: "dispatched" }[activeTab] || activeTab;
 
   const totalItems  = groups.reduce((s, g) => s + g.items.length, 0);
   const totalQty    = groups.reduce((s, g) => g.items.reduce((ss, it) => ss + Number(it.qty), s), 0);
@@ -225,8 +238,15 @@ export default function StockOut() {
           className={`so-tab-btn${activeTab === "completed" ? " so-tab-active" : ""}`}
           onClick={() => setActiveTab("completed")}
         >
-          Completed
+          Finish Good
           <span className="so-tab-count">{completedCount}</span>
+        </button>
+        <button
+          className={`so-tab-btn${activeTab === "dispatched" ? " so-tab-active" : ""}`}
+          onClick={() => setActiveTab("dispatched")}
+        >
+          Dispatched
+          <span className="so-tab-count">{dispatchedCount}</span>
         </button>
       </div>
 
@@ -250,7 +270,7 @@ export default function StockOut() {
       {/* Accordion */}
       {groups.length === 0 ? (
         <div className="card" style={{ padding: "48px 24px", textAlign: "center", color: "var(--text-sub)" }}>
-          No {activeTab} work orders found.
+          No {tabLabel} work orders found.
         </div>
       ) : (
         <div className="wo-list">
