@@ -5,6 +5,41 @@ import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
 import StockOutForm from "./StockOutForm";
 
+// Derive a work order's overall state from its line items, so the tab counts
+// and the tab contents always agree even if individual rows disagree
+// (e.g. backend stamps dispatch_bill on only some rows of a WO).
+function woState(items) {
+  const dispatchBill = items.find(it => it.dispatchBill)?.dispatchBill || null;
+  const completed = items.length > 0 && items.every(it => (it.status || "running") === "completed");
+  return { dispatchBill, status: completed ? "completed" : "running" };
+}
+
+function buildGroups(records) {
+  const sorted = [...records].sort(
+    (a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
+  );
+  const map = new Map();
+  sorted.forEach(so => {
+    const key = so.workOrder || `__solo_${so.id}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        workOrder:  so.workOrder || null,
+        date:       so.date,
+        branchName: so.branchName || "",
+        reason:     so.reason || "",
+        notes:      so.notes  || "",
+        items:      [],
+      });
+    }
+    map.get(key).items.push(so);
+  });
+  return [...map.values()].map(g => ({ ...g, ...woState(g.items) }));
+}
+
+const tabOf = (g) =>
+  g.dispatchBill ? "dispatched" : g.status === "completed" ? "completed" : "running";
+
 export default function StockOut() {
   const { stockOuts, products, branches, categories, addStockOut, addStockOutBatch, updateStockOut, completeWorkOrder, dispatchWorkOrder } = useApp();
   const toast = useToast();
@@ -138,60 +173,23 @@ export default function StockOut() {
   };
 
   // ── grouping ─────────────────────────────────────────────────
+  const allGroups = useMemo(() => buildGroups(stockOuts), [stockOuts]);
+
   const groups = useMemo(() => {
-    const sorted = [...stockOuts].sort(
-      (a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date)
-    );
-
-    const map = new Map();
-    sorted.forEach(so => {
-      if (filterB !== "all" && so.branchId !== parseInt(filterB)) return;
-      const key = so.workOrder || `__solo_${so.id}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          workOrder:  so.workOrder || null,
-          date:       so.date,
-          branchName: so.branchName || "",
-          reason:     so.reason || "",
-          notes:      so.notes  || "",
-          status:      so.status || "running",
-          dispatchBill: so.dispatchBill || null,
-          items:       [],
-        });
-      }
-      map.get(key).items.push(so);
-    });
-
-    return [...map.values()]
-      .filter(g => {
-        if (activeTab === "running")    return (g.status || "running") === "running";
-        if (activeTab === "completed")  return g.status === "completed" && !g.dispatchBill;
-        if (activeTab === "dispatched") return !!g.dispatchBill;
-        return false;
-      })
+    return allGroups
+      .filter(g => filterB === "all" || g.items.some(it => it.branchId === parseInt(filterB)))
+      .filter(g => tabOf(g) === activeTab)
       .filter(g =>
         !search.trim() ||
         g.workOrder?.toLowerCase().includes(search.toLowerCase()) ||
         g.reason?.toLowerCase().includes(search.toLowerCase()) ||
         g.items.some(it => (it.productName || "").toLowerCase().includes(search.toLowerCase()))
       );
-  }, [stockOuts, filterB, search, activeTab]);
+  }, [allGroups, filterB, search, activeTab]);
 
-  const runningCount = useMemo(() => {
-    const keys = new Set(stockOuts.filter(s => (s.status || "running") === "running").map(s => s.workOrder || `__solo_${s.id}`));
-    return keys.size;
-  }, [stockOuts]);
-
-  const completedCount = useMemo(() => {
-    const keys = new Set(stockOuts.filter(s => s.status === "completed" && !s.dispatchBill).map(s => s.workOrder || `__solo_${s.id}`));
-    return keys.size;
-  }, [stockOuts]);
-
-  const dispatchedCount = useMemo(() => {
-    const keys = new Set(stockOuts.filter(s => !!s.dispatchBill).map(s => s.workOrder || `__solo_${s.id}`));
-    return keys.size;
-  }, [stockOuts]);
+  const runningCount    = useMemo(() => allGroups.filter(g => tabOf(g) === "running").length,    [allGroups]);
+  const completedCount  = useMemo(() => allGroups.filter(g => tabOf(g) === "completed").length,  [allGroups]);
+  const dispatchedCount = useMemo(() => allGroups.filter(g => tabOf(g) === "dispatched").length, [allGroups]);
 
   const tabLabel = { running: "running", completed: "finish good", dispatched: "dispatched" }[activeTab] || activeTab;
 
