@@ -1,18 +1,36 @@
 import { useState, useMemo } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
+import ConfirmDialog from "../common/ConfirmDialog";
 import StockInForm from "./StockInForm";
 import DataTable from "../common/DataTable";
 
 const today = () => new Date().toISOString().split("T")[0];
 
 export default function StockIn() {
-  const { stockIns, products, branches, categories, updateStockIn } = useApp();
+  const { stockIns, products, branches, categories, updateStockIn, deleteStockIn } = useApp();
   const toast = useToast();
   const [showAdd,  setShowAdd]  = useState(false);
   const [filterB,  setFilterB]  = useState("all");
+
+  // ── Delete state ──────────────────────────────────────────────
+  const [delRecord, setDelRecord] = useState(null);
+  const [deleting,  setDeleting]  = useState(false);
+
+  const doDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteStockIn(delRecord.id);
+      toast.success("Stock in record deleted — stock adjusted back.");
+      setDelRecord(null);
+    } catch (err) {
+      toast.error(err.message || "Failed to delete record.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // ── Edit state ────────────────────────────────────────────────
   const [editRecord, setEditRecord] = useState(null);
@@ -129,11 +147,16 @@ export default function StockIn() {
       exportValue: r => r.notes || "",
     },
     {
-      key: "_actions", label: "", width: "48px", exportValue: false,
+      key: "_actions", label: "", width: "76px", exportValue: false,
       render: r => (
-        <button className="icon-btn" title="Edit" onClick={e => { e.stopPropagation(); openEdit(r); }}>
-          <Pencil size={14} />
-        </button>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button className="icon-btn" title="Edit" onClick={e => { e.stopPropagation(); openEdit(r); }}>
+            <Pencil size={14} />
+          </button>
+          <button className="icon-btn icon-btn-red" title="Delete" onClick={e => { e.stopPropagation(); setDelRecord(r); }}>
+            <Trash2 size={14} />
+          </button>
+        </div>
       ),
     },
   ], [products, branches, categories]); // eslint-disable-line
@@ -254,6 +277,18 @@ export default function StockIn() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {/* ── Delete confirmation ── */}
+      {delRecord && (
+        <ConfirmDialog
+          title="Delete Stock In Record"
+          message={`Delete this stock-in entry of ${delRecord.qty} × ${delRecord.productName || "this product"}? Its stock will be reduced by ${delRecord.qty} to undo the addition. This cannot be undone.`}
+          danger
+          confirmLabel={deleting ? "Deleting…" : "Delete"}
+          onConfirm={doDelete}
+          onCancel={() => setDelRecord(null)}
+        />
       )}
     </div>
   );

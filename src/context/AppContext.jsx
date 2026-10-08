@@ -124,6 +124,14 @@ export function AppProvider({ children }) {
     return res.data;
   };
 
+  const deleteStockIn = async (id) => {
+    await stockInApi.remove(id);
+    setStockIns((p) => p.filter((si) => si.id !== id));
+    // Backend reverses the product's stock on delete — refresh from server
+    const updated = await productApi.getAll();
+    setProducts(updated.data || []);
+  };
+
   // ── Stock Out ────────────────────────────────────────────────────────────
   const addStockOut = async (data) => {
     const res = await stockOutApi.create(data);
@@ -141,17 +149,25 @@ export function AppProvider({ children }) {
     return res.data;
   };
 
-  const completeWorkOrder = async (workOrder) => {
-    await stockOutApi.completeWorkOrder(workOrder);
+  const deleteStockOut = async (id) => {
+    await stockOutApi.remove(id);
+    setStockOuts((p) => p.filter((so) => so.id !== id));
+    // Backend restores the product's stock on delete — refresh from server
+    const updated = await productApi.getAll();
+    setProducts(updated.data || []);
+  };
+
+  const completeWorkOrder = async (workOrder, completedAt) => {
+    const res = await stockOutApi.completeWorkOrder(workOrder, completedAt);
     setStockOuts((p) =>
-      p.map((so) => (so.workOrder === workOrder ? { ...so, status: 'completed' } : so))
+      p.map((so) => (so.workOrder === workOrder ? { ...so, status: 'completed', completedAt: res.data.completedAt } : so))
     );
   };
 
-  const dispatchWorkOrder = async (workOrder, dispatchBill) => {
-    await stockOutApi.dispatchWorkOrder(workOrder, dispatchBill);
+  const dispatchWorkOrder = async (workOrder, dispatchBill, dispatchedAt) => {
+    const res = await stockOutApi.dispatchWorkOrder(workOrder, dispatchBill, dispatchedAt);
     setStockOuts((p) =>
-      p.map((so) => (so.workOrder === workOrder ? { ...so, dispatchBill } : so))
+      p.map((so) => (so.workOrder === workOrder ? { ...so, dispatchBill, dispatchedAt: res.data.dispatchedAt } : so))
     );
   };
 
@@ -254,7 +270,8 @@ export function AppProvider({ children }) {
         addBranch, updateBranch, deleteBranch,
         addCategory, updateCategory, deleteCategory,
         addProduct, updateProduct, deleteProduct,
-        addStockIn, updateStockIn, addStockOut, addStockOutBatch, updateStockOut, completeWorkOrder, dispatchWorkOrder,
+        addStockIn, updateStockIn, deleteStockIn,
+        addStockOut, addStockOutBatch, updateStockOut, deleteStockOut, completeWorkOrder, dispatchWorkOrder,
         addPurchase, updatePurchase, deletePurchase, receivePurchase, updatePurchaseStatus,
         addPreviewOrder, updatePreviewOrder, deletePreviewOrder,
         getBranch, getCategory, getProduct,

@@ -1,18 +1,23 @@
 import { useState, useMemo } from "react";
-import { Plus, ChevronDown, ChevronRight, Filter, FileText, Check, X, CheckCircle2, Truck, Pencil } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Filter, FileText, Check, X, CheckCircle2, Truck, Pencil, Trash2 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useToast } from "../../context/ToastContext";
 import Modal from "../common/Modal";
+import ConfirmDialog from "../common/ConfirmDialog";
 import StockOutForm from "./StockOutForm";
 
 // Derive a work order's overall state from its line items, so the tab counts
 // and the tab contents always agree even if individual rows disagree
 // (e.g. backend stamps dispatch_bill on only some rows of a WO).
 function woState(items) {
-  const dispatchBill = items.find(it => it.dispatchBill)?.dispatchBill || null;
+  const dispatchBill  = items.find(it => it.dispatchBill)?.dispatchBill   || null;
+  const completedAt   = items.find(it => it.completedAt)?.completedAt   || null;
+  const dispatchedAt  = items.find(it => it.dispatchedAt)?.dispatchedAt || null;
   const completed = items.length > 0 && items.every(it => (it.status || "running") === "completed");
-  return { dispatchBill, status: completed ? "completed" : "running" };
+  return { dispatchBill, dispatchedAt, completedAt, status: completed ? "completed" : "running" };
 }
+
+const today = () => new Date().toISOString().split("T")[0];
 
 function buildGroups(records) {
   const sorted = [...records].sort(
@@ -41,7 +46,7 @@ const tabOf = (g) =>
   g.dispatchBill ? "dispatched" : g.status === "completed" ? "completed" : "running";
 
 export default function StockOut() {
-  const { stockOuts, products, branches, categories, addStockOut, addStockOutBatch, updateStockOut, completeWorkOrder, dispatchWorkOrder } = useApp();
+  const { stockOuts, products, branches, categories, addStockOut, addStockOutBatch, updateStockOut, deleteStockOut, completeWorkOrder, dispatchWorkOrder } = useApp();
   const toast = useToast();
 
   const [activeTab,     setActiveTab]     = useState("running");
@@ -60,17 +65,23 @@ export default function StockOut() {
 
   // complete work order confirmation
   const [confirmComplete, setConfirmComplete] = useState(null); // workOrder string
+  const [completeDateVal, setCompleteDateVal] = useState(today());
   const [completing,      setCompleting]      = useState(false);
 
   // dispatch modal
   const [dispatchModal,   setDispatchModal]   = useState(null); // workOrder string
   const [dispatchBillVal, setDispatchBillVal] = useState("");
+  const [dispatchDateVal, setDispatchDateVal] = useState(today());
   const [dispatching,     setDispatching]     = useState(false);
 
   // inline item qty edit
   const [editingItemId, setEditingItemId] = useState(null);
   const [editItemQty,   setEditItemQty]   = useState("");
   const [editItemSaving, setEditItemSaving] = useState(false);
+
+  // delete item confirmation
+  const [delItem,    setDelItem]    = useState(null); // stock-out row
+  const [deletingItem, setDeletingItem] = useState(false);
 
   const startEditItem = (it) => { setEditingItemId(it.id); setEditItemQty(String(it.qty)); };
   const cancelEditItem = () => { setEditingItemId(null); setEditItemQty(""); };
@@ -90,6 +101,19 @@ export default function StockOut() {
       toast.error(e.message || "Failed to update.");
     } finally {
       setEditItemSaving(false);
+    }
+  };
+
+  const doDeleteItem = async () => {
+    setDeletingItem(true);
+    try {
+      await deleteStockOut(delItem.id);
+      toast.success("Item deleted — stock restored.");
+      setDelItem(null);
+    } catch (e) {
+      toast.error(e.message || "Failed to delete item.");
+    } finally {
+      setDeletingItem(false);
     }
   };
 
@@ -144,9 +168,10 @@ export default function StockOut() {
 
   // ── complete work order ───────────────────────────────────────
   const doComplete = async (workOrder) => {
+    if (!completeDateVal) return toast.error("Select a completion date.");
     setCompleting(true);
     try {
-      await completeWorkOrder(workOrder);
+      await completeWorkOrder(workOrder, completeDateVal);
       toast.success(`Work order ${workOrder} marked as completed.`);
       setConfirmComplete(null);
     } catch (e) {
@@ -158,9 +183,10 @@ export default function StockOut() {
 
   const doDispatch = async () => {
     if (!dispatchBillVal.trim()) return toast.error("Enter a bill number.");
+    if (!dispatchDateVal)        return toast.error("Select a dispatch date.");
     setDispatching(true);
     try {
-      await dispatchWorkOrder(dispatchModal, dispatchBillVal.trim());
+      await dispatchWorkOrder(dispatchModal, dispatchBillVal.trim(), dispatchDateVal);
       toast.success(`Work order ${dispatchModal} dispatched — Bill: ${dispatchBillVal.trim()}`);
       setDispatchModal(null);
       setDispatchBillVal("");
@@ -205,6 +231,12 @@ export default function StockOut() {
     }, s), 0);
 
   const fmt = (n) => "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Dispatch modal can't be earlier than the WO's completion date (or its earliest item date)
+  const dispatchGroup   = dispatchModal ? allGroups.find(g => g.workOrder === dispatchModal) : null;
+  const dispatchMinDate = dispatchGroup
+    ? (dispatchGroup.completedAt || dispatchGroup.items.reduce((min, it) => (!min || it.date < min ? it.date : min), null))
+    : undefined;
 
   return (
     <div className="page">
@@ -287,6 +319,8 @@ export default function StockOut() {
             const isAdding = addingToGroup === group.key;
             const isConfirmingComplete = confirmComplete !== null && confirmComplete === group.workOrder;
             const isDispatched = !!group.dispatchBill;
+            // can't mark complete before the work actually happened
+            const minCompleteDate = group.items.reduce((min, it) => (!min || it.date < min ? it.date : min), null);
 
             const groupBranchId = group.items[0]?.branchId;
             const addableProds  = groupBranchId
@@ -345,10 +379,17 @@ export default function StockOut() {
                 {isOpen && (
                   <div className="wo-card-body">
                     {group.notes && <p className="wo-notes">{group.notes}</p>}
+                    {group.completedAt && (
+                      <p className="td-meta" style={{ marginBottom: 8 }}>
+                        Completed on <strong>{group.completedAt}</strong>
+                      </p>
+                    )}
                     {isDispatched && (
                       <div className="wo-dispatch-info">
                         <Truck size={13} />
-                        <span>Dispatched · Bill <strong>{group.dispatchBill}</strong></span>
+                        <span>
+                          Dispatched{group.dispatchedAt ? ` on ${group.dispatchedAt}` : ""} · Bill <strong>{group.dispatchBill}</strong>
+                        </span>
                       </div>
                     )}
 
@@ -361,7 +402,7 @@ export default function StockOut() {
                           <th className="text-right">Qty</th>
                           <th className="text-right">Rate (₹)</th>
                           <th className="text-right">Amount (₹)</th>
-                          {activeTab === "running" && <th style={{ width: 44 }}></th>}
+                          {activeTab === "running" && <th style={{ width: 72 }}></th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -411,11 +452,20 @@ export default function StockOut() {
                                 {amount != null ? fmt(amount) : "—"}
                               </td>
                               {activeTab === "running" && (
-                                <td className="text-center">
+                                <td className="text-center" style={{ whiteSpace: "nowrap" }}>
                                   {!isEditingThis && (
-                                    <button className="icon-btn" title="Edit qty" onClick={() => startEditItem(it)}>
-                                      <Pencil size={14} />
-                                    </button>
+                                    <>
+                                      <button className="icon-btn" title="Edit qty" onClick={() => startEditItem(it)}>
+                                        <Pencil size={14} />
+                                      </button>
+                                      <button
+                                        className="icon-btn icon-btn-red"
+                                        title="Delete item"
+                                        onClick={() => setDelItem(it)}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </>
                                   )}
                                 </td>
                               )}
@@ -512,7 +562,7 @@ export default function StockOut() {
                       <div className="wo-add-item-bar">
                         <button
                           className="btn btn-primary btn-sm"
-                          onClick={() => { setDispatchModal(group.workOrder); setDispatchBillVal(""); }}
+                          onClick={() => { setDispatchModal(group.workOrder); setDispatchBillVal(""); setDispatchDateVal(today()); }}
                         >
                           <Truck size={13} /> Ready to Dispatch
                         </button>
@@ -525,10 +575,21 @@ export default function StockOut() {
                         {isConfirmingComplete ? (
                           <div className="wo-confirm-complete">
                             <span>Mark <strong>{group.workOrder}</strong> as completed? This cannot be undone.</span>
+                            <div className="form-group" style={{ marginTop: 10, marginBottom: 0, maxWidth: 200 }}>
+                              <label className="form-label">Completion Date</label>
+                              <input
+                                type="date"
+                                className="form-input form-input-sm"
+                                value={completeDateVal}
+                                min={minCompleteDate || undefined}
+                                max={today()}
+                                onChange={e => setCompleteDateVal(e.target.value)}
+                              />
+                            </div>
                             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                               <button
                                 className="btn btn-success btn-sm"
-                                disabled={completing}
+                                disabled={completing || !completeDateVal}
                                 onClick={() => doComplete(confirmComplete)}
                               >
                                 <CheckCircle2 size={13} /> {completing ? "Completing…" : "Yes, Complete"}
@@ -553,7 +614,7 @@ export default function StockOut() {
                             {isWO && !isAdding && (
                               <button
                                 className="btn btn-success btn-sm"
-                                onClick={() => setConfirmComplete(group.workOrder)}
+                                onClick={() => { setConfirmComplete(group.workOrder); setCompleteDateVal(today()); }}
                               >
                                 <CheckCircle2 size={13} /> Complete Work Order
                               </button>
@@ -587,14 +648,37 @@ export default function StockOut() {
                 autoFocus
               />
             </div>
+            <div className="form-group">
+              <label className="form-label">Dispatch Date <span style={{ color: "var(--danger)" }}>*</span></label>
+              <input
+                type="date"
+                className="form-input"
+                value={dispatchDateVal}
+                min={dispatchMinDate || undefined}
+                max={today()}
+                onChange={e => setDispatchDateVal(e.target.value)}
+              />
+            </div>
             <div className="form-actions" style={{ marginTop: 20 }}>
               <button className="btn btn-outline" onClick={() => setDispatchModal(null)} disabled={dispatching}>Cancel</button>
-              <button className="btn btn-primary" onClick={doDispatch} disabled={dispatching || !dispatchBillVal.trim()}>
+              <button className="btn btn-primary" onClick={doDispatch} disabled={dispatching || !dispatchBillVal.trim() || !dispatchDateVal}>
                 <Truck size={14} /> {dispatching ? "Dispatching…" : "Confirm Dispatch"}
               </button>
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Delete item confirmation */}
+      {delItem && (
+        <ConfirmDialog
+          title="Delete Stock Out Item"
+          message={`Delete "${delItem.productName || "this item"}" (${delItem.qty} ${delItem.unit || ""})${delItem.workOrder ? ` from work order ${delItem.workOrder}` : ""}? Its stock will be restored by ${delItem.qty}. This cannot be undone.`}
+          danger
+          confirmLabel={deletingItem ? "Deleting…" : "Delete"}
+          onConfirm={doDeleteItem}
+          onCancel={() => setDelItem(null)}
+        />
       )}
 
       {showAdd && (

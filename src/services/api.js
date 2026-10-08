@@ -145,8 +145,8 @@ export const stockOutApi = {
   create:  (data)       => request('POST',   '/stock-out', data),
   batch:   (data)       => request('POST',   '/stock-out/batch', data),
   update:          (id, data)   => request('PUT',    `/stock-out/${id}`, data),
-  completeWorkOrder:  (workOrder)               => request('POST', '/stock-out/complete-wo', { workOrder }),
-  dispatchWorkOrder:  (workOrder, dispatchBill) => request('POST', '/stock-out/dispatch-wo', { workOrder, dispatchBill }),
+  completeWorkOrder:  (workOrder, completedAt)               => request('POST', '/stock-out/complete-wo', { workOrder, completedAt }),
+  dispatchWorkOrder:  (workOrder, dispatchBill, dispatchedAt) => request('POST', '/stock-out/dispatch-wo', { workOrder, dispatchBill, dispatchedAt }),
   remove:          (id)         => request('DELETE', `/stock-out/${id}`),
 };
 

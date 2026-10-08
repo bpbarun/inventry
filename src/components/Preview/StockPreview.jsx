@@ -15,8 +15,10 @@ const newWO = (name) => ({ _id: ++_woKey, name, rows: [newRow()], open: true });
 const fmt = (n) =>
   "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Frontend FIFO: mirrors the PHP logic
-function calcFifoCost(stockIns, stockOuts, productId, qty) {
+// Frontend FIFO: mirrors the PHP logic.
+// `priorPreviewQty` = units of this product already consumed by earlier work
+// orders in the simulation, so the rate reflects the cheaper lots being gone.
+function calcFifoCost(stockIns, stockOuts, productId, qty, priorPreviewQty = 0) {
   const lots = stockIns
     .filter((si) => si.productId === productId && Number(si.unitCost) > 0)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id))
@@ -30,14 +32,17 @@ function calcFifoCost(stockIns, stockOuts, productId, qty) {
     .filter((so) => so.productId === productId && so.totalCost != null)
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id - b.id));
 
-  for (const so of knownSOs) {
-    let rem = Number(so.qty);
+  const drain = (amount) => {
+    let rem = amount;
     for (let i = 0; i < queue.length && rem > 0; i++) {
       const take = Math.min(rem, queue[i].qty);
       queue[i].qty -= take;
       rem -= take;
     }
-  }
+  };
+
+  for (const so of knownSOs) drain(Number(so.qty));
+  if (priorPreviewQty > 0) drain(priorPreviewQty);
 
   let totalCost = 0, hasRate = false, toConsume = qty;
   for (const lot of queue.filter((l) => l.qty > 0)) {
@@ -50,28 +55,42 @@ function calcFifoCost(stockIns, stockOuts, productId, qty) {
   return hasRate ? totalCost : null;
 }
 
-function computeResults(rows, products, categories, stockIns, stockOuts) {
-  const valid = rows.filter((r) => r.productId && parseInt(r.qty) > 0);
-  if (valid.length === 0) return [];
+// Simulate a chain of work orders against one shared stock pool. Each entry is
+// { id, rows }; stock (and FIFO lots) drawn by earlier entries are subtracted
+// before the next entry is evaluated.
+function computeChain(entries, products, categories, stockIns, stockOuts) {
+  const consumed = {}; // productId -> units taken by earlier work orders
+  const out = {};
 
-  const totals = {};
-  valid.forEach((r) => {
-    const pid = parseInt(r.productId);
-    totals[pid] = (totals[pid] || 0) + parseInt(r.qty);
+  entries.forEach((entry) => {
+    const valid = (entry.rows || []).filter((r) => r.productId && parseInt(r.qty) > 0);
+    const totals = {};
+    valid.forEach((r) => {
+      const pid = parseInt(r.productId);
+      totals[pid] = (totals[pid] || 0) + parseInt(r.qty);
+    });
+
+    out[entry.id] = Object.entries(totals)
+      .map(([pid, requested]) => {
+        const prod = products.find((p) => p.id === parseInt(pid));
+        if (!prod) return null;
+        const cat        = categories.find((c) => c.id === prod.categoryId);
+        const priorUse   = consumed[pid] || 0;
+        const baseStock  = Number(prod.stock);
+        const current    = baseStock - priorUse;
+        const remaining  = current - requested;
+        const fifoAmount = calcFifoCost(stockIns, stockOuts, prod.id, requested, priorUse);
+        const unitRate   = fifoAmount != null && requested > 0 ? fifoAmount / requested : null;
+        return { prod, cat, baseStock, priorUse, current, requested, remaining, fifoAmount, unitRate };
+      })
+      .filter(Boolean);
+
+    Object.entries(totals).forEach(([pid, requested]) => {
+      consumed[pid] = (consumed[pid] || 0) + requested;
+    });
   });
 
-  return Object.entries(totals)
-    .map(([pid, requested]) => {
-      const prod = products.find((p) => p.id === parseInt(pid));
-      if (!prod) return null;
-      const cat        = categories.find((c) => c.id === prod.categoryId);
-      const current    = Number(prod.stock);
-      const remaining  = current - requested;
-      const fifoAmount = calcFifoCost(stockIns, stockOuts, prod.id, requested);
-      const unitRate   = fifoAmount != null && requested > 0 ? fifoAmount / requested : null;
-      return { prod, cat, current, requested, remaining, fifoAmount, unitRate };
-    })
-    .filter(Boolean);
+  return out;
 }
 
 function ResultsSummary({ results }) {
@@ -109,7 +128,7 @@ function ResultsTable({ results }) {
         </tr>
       </thead>
       <tbody>
-        {results.map(({ prod, cat, current, requested, remaining, fifoAmount, unitRate }) => {
+        {results.map(({ prod, cat, baseStock, priorUse, current, requested, remaining, fifoAmount, unitRate }) => {
           const shortage = remaining < 0;
           const low      = !shortage && remaining <= Number(prod.minStock);
           return (
@@ -117,7 +136,14 @@ function ResultsTable({ results }) {
               <td><p className="td-name">{prod.name}</p></td>
               <td><span className="td-meta">{prod.sku}</span></td>
               <td>{cat && <span className="cat-chip">{cat.icon} {cat.name}</span>}</td>
-              <td className="text-right">{current} {prod.unit}</td>
+              <td className="text-right">
+                {current} {prod.unit}
+                {priorUse > 0 && (
+                  <span className="td-meta" style={{ display: "block", fontSize: 10 }}>
+                    {baseStock} − {priorUse} earlier
+                  </span>
+                )}
+              </td>
               <td className="text-right" style={{ color: "var(--text-sub)" }}>−{requested} {prod.unit}</td>
               <td className="text-right prev-remaining" style={{ color: shortage ? "var(--danger)" : low ? "var(--warning)" : "var(--success)" }}>
                 {remaining} {prod.unit}
@@ -337,33 +363,26 @@ export default function StockPreview() {
   };
 
   // ── FIFO results ──────────────────────────────────────────────────────────
-  const sessionResults = useMemo(
-    () => workOrders.map((wo) => ({
-      woId:    wo._id,
-      results: computeResults(wo.rows, products, categories, stockIns, stockOuts),
-    })),
-    [workOrders, products, categories, stockIns, stockOuts]
-  );
-
-  const savedResults = useMemo(
-    () => previewOrders.map((order) => {
-      const rows = (order.items || []).map((item) => ({
-        _key:      item.id,
-        productId: String(item.productId),
-        qty:       String(item.qty),
+  // One shared simulation: saved records oldest→newest first (the WO being
+  // edited uses its live rows), then unsaved session work orders in list order.
+  const chain = useMemo(() => {
+    const savedEntries = [...previewOrders]
+      .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+      .map((order) => ({
+        id: `saved_${order.id}`,
+        rows: editingId === order.id
+          ? editRows
+          : (order.items || []).map((item) => ({
+              _key: item.id, productId: String(item.productId), qty: String(item.qty),
+            })),
       }));
-      return {
-        orderId: order.id,
-        results: computeResults(rows, products, categories, stockIns, stockOuts),
-      };
-    }),
-    [previewOrders, products, categories, stockIns, stockOuts]
-  );
+    const sessionEntries = workOrders.map((wo) => ({ id: `session_${wo._id}`, rows: wo.rows }));
+    return computeChain([...savedEntries, ...sessionEntries], products, categories, stockIns, stockOuts);
+  }, [previewOrders, workOrders, editingId, editRows, products, categories, stockIns, stockOuts]);
 
-  const editResults = useMemo(
-    () => computeResults(editRows, products, categories, stockIns, stockOuts),
-    [editRows, products, categories, stockIns, stockOuts]
-  );
+  const sessionResults = workOrders.map((wo) => ({ woId: wo._id, results: chain[`session_${wo._id}`] || [] }));
+  const savedResults   = previewOrders.map((order) => ({ orderId: order.id, results: chain[`saved_${order.id}`] || [] }));
+  const editResults    = editingId != null ? (chain[`saved_${editingId}`] || []) : [];
 
   // ── Shared product rows editor ────────────────────────────────────────────
   const renderRows = (rows, onSetField, onAddRow, onRemoveRow, prodList) => (
@@ -440,7 +459,11 @@ export default function StockPreview() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Stock Preview</h1>
-          <p className="page-subtitle">Simulate stock-outs per work order. Save to records for future reference.</p>
+          <p className="page-subtitle">
+            Simulate stock-outs per work order. Stock draws down cumulatively —
+            saved records (oldest first), then unsaved work orders — so each order
+            sees what earlier ones already consumed.
+          </p>
         </div>
       </div>
 
@@ -620,7 +643,6 @@ export default function StockPreview() {
             const isOpen    = openSavedIds.has(order.id);
             const isEditing = editingId === order.id;
             const { results: viewResults } = savedResults.find((r) => r.orderId === order.id) || { results: [] };
-            const results   = isEditing ? editResults : viewResults;
             const itemCount = (order.items || []).length;
 
             return (
